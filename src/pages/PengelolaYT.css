@@ -1,0 +1,763 @@
+/* ═══════════════════════════════════════════════
+   PENGELOLA YOUTUBE
+═══════════════════════════════════════════════ */
+.py-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ── Channel Selector ── */
+.py-channel-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.py-ch-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #121620;
+    border: 1px solid #212631;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    text-align: left;
+}
+
+.py-ch-card:hover {
+    border-color: #2d3748;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.ch-selected {
+    border-color: #2172e5 !important;
+    background: rgba(33, 114, 229, 0.06) !important;
+}
+
+.py-ch-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.py-ch-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.py-ch-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.py-ch-subs {
+    font-size: 11px;
+    color: #718096;
+}
+
+.py-ch-growth {
+    font-size: 12px;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+.growth-up {
+    color: #00b87c;
+}
+
+.growth-down {
+    color: #ef4444;
+}
+
+/* ── Tab Bar ── */
+.py-tab-bar {
+    display: flex;
+    gap: 4px;
+    background: #121620;
+    border: 1px solid #212631;
+    border-radius: 10px;
+    padding: 6px;
+}
+
+.py-tab {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #718096;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.py-tab:hover {
+    color: #a0aec0;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.py-tab-active {
+    background: rgba(33, 114, 229, 0.12) !important;
+    color: #fff !important;
+}
+
+/* ── Metrics ── */
+.py-metrics-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+
+.py-metric-card {
+    background: #121620;
+    border: 1px solid #212631;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+
+.py-metric-card:hover {
+    border-color: #2d3748;
+}
+
+.py-metric-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+}
+
+.py-metric-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+}
+
+.py-metric-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+.py-metric-change {
+    font-size: 11px;
+    font-weight: 800;
+    margin-top: 6px;
+}
+
+.change-up {
+    color: #00b87c;
+}
+
+.change-down {
+    color: #ef4444;
+}
+
+/* ── Overview Grid ── */
+.py-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.py-overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.py-chart-card,
+.py-top-videos-card {
+    background: #121620;
+    border: 1px solid #212631;
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.py-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.3px;
+    margin-bottom: 16px;
+}
+
+/* Bar Chart */
+.py-bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    height: 180px;
+    padding: 0 8px;
+}
+
+.py-bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+}
+
+.py-bar-wrapper {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.py-bar {
+    width: 100%;
+    max-width: 40px;
+    background: linear-gradient(180deg, #00b87c 0%, rgba(0, 184, 124, 0.3) 100%);
+    border-radius: 4px 4px 0 0;
+    position: relative;
+    transition: height 0.4s ease;
+    min-height: 8px;
+}
+
+.py-bar-val {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 700;
+    color: #00b87c;
+    white-space: nowrap;
+}
+
+.py-bar-label {
+    font-size: 11px;
+    color: #718096;
+    font-weight: 600;
+}
+
+/* Top Videos */
+.py-top-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.py-top-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+}
+
+.py-top-rank {
+    font-size: 12px;
+    font-weight: 800;
+    color: #4a5568;
+    min-width: 26px;
+}
+
+.py-top-thumb {
+    font-size: 22px;
+}
+
+.py-top-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.py-top-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.py-top-stats {
+    font-size: 11px;
+    color: #718096;
+    margin-top: 2px;
+}
+
+/* ── Videos ── */
+.py-videos-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.py-videos-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.py-video-filters {
+    display: flex;
+    gap: 6px;
+}
+
+.py-vf-btn {
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid #2d3748;
+    background: transparent;
+    color: #718096;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.py-vf-btn:hover {
+    border-color: #4a5568;
+    color: #a0aec0;
+}
+
+.py-vf-active {
+    background: rgba(33, 114, 229, 0.12) !important;
+    border-color: #2172e5 !important;
+    color: #60a5fa !important;
+}
+
+.py-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid #2d3748;
+    background: rgba(255, 255, 255, 0.02);
+    color: #718096;
+}
+
+.py-search-wrap input {
+    background: transparent;
+    border: none;
+    color: #e2e8f0;
+    font-size: 13px;
+    outline: none;
+    width: 180px;
+    font-family: inherit;
+}
+
+.py-video-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.py-video-card {
+    background: #121620;
+    border: 1px solid #212631;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    position: relative;
+}
+
+.py-video-card:hover {
+    border-color: #2d3748;
+}
+
+.py-video-thumb {
+    height: 130px;
+    background: linear-gradient(135deg, #0d1117 0%, #1a2030 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.py-thumb-emoji {
+    font-size: 42px;
+}
+
+.py-video-duration {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.py-video-status {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.status-public {
+    background: rgba(0, 184, 124, 0.15);
+    color: #00b87c;
+    border: 1px solid rgba(0, 184, 124, 0.3);
+}
+
+.status-unlisted {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-draft {
+    background: rgba(107, 114, 128, 0.15);
+    color: #9ca3af;
+    border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.py-video-body {
+    padding: 12px 14px;
+}
+
+.py-video-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e2e8f0;
+    line-height: 1.4;
+    margin-bottom: 6px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.py-video-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: #718096;
+    margin-bottom: 6px;
+}
+
+.py-video-stats-row {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: #4a5568;
+}
+
+.py-video-delete {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    color: #718096;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transition: all 0.15s;
+}
+
+.py-video-card:hover .py-video-delete {
+    opacity: 1;
+}
+
+.py-video-delete:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.2);
+}
+
+/* ── Comments ── */
+.py-comments-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.py-comments-toolbar {
+    display: flex;
+    gap: 6px;
+}
+
+.py-cf-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid #2d3748;
+    background: transparent;
+    color: #718096;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.py-cf-btn:hover {
+    border-color: #4a5568;
+}
+
+.py-cf-active {
+    background: rgba(33, 114, 229, 0.12) !important;
+    border-color: #2172e5 !important;
+    color: #60a5fa !important;
+}
+
+.py-comment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.py-comment-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 18px;
+    background: #121620;
+    border: 1px solid #212631;
+    border-radius: 10px;
+    transition: border-color 0.2s;
+}
+
+.py-comment-card:hover {
+    border-color: #2d3748;
+}
+
+.comment-spam {
+    opacity: 0.5;
+    border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+.comment-avatar {
+    font-size: 26px;
+    flex-shrink: 0;
+}
+
+.comment-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+
+.comment-user {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.comment-time {
+    font-size: 11px;
+    color: #4a5568;
+}
+
+.comment-status-badge {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.cs-approved {
+    background: rgba(0, 184, 124, 0.12);
+    color: #00b87c;
+}
+
+.cs-pending {
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+}
+
+.cs-spam {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+}
+
+.comment-text {
+    font-size: 13px;
+    color: #a0aec0;
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.comment-footer {
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: #4a5568;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.ca-approve,
+.ca-delete {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #2d3748;
+    background: transparent;
+    color: #718096;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    transition: all 0.15s;
+}
+
+.ca-approve:hover {
+    color: #00b87c;
+    border-color: #00b87c;
+    background: rgba(0, 184, 124, 0.1);
+}
+
+.ca-delete:hover {
+    color: #ef4444;
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* ── Monetization ── */
+.py-monetization {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.py-money-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.py-money-card {
+    background: #121620;
+    border: 1px solid #212631;
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+}
+
+.py-mc-total {
+    border-color: rgba(0, 184, 124, 0.3);
+    background: linear-gradient(135deg, rgba(0, 184, 124, 0.05) 0%, #121620 100%);
+}
+
+.py-mc-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.py-mc-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+}
+
+.py-mc-sub {
+    font-size: 11px;
+    color: #4a5568;
+    margin-top: 6px;
+}
+
+.py-mc-total .py-mc-value {
+    color: #00b87c;
+}
+
+.py-revenue-table {
+    background: #121620;
+    border: 1px solid #212631;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.py-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.py-table th {
+    padding: 12px 20px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: left;
+    border-bottom: 1px solid #212631;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.py-table td {
+    padding: 14px 20px;
+    font-size: 13px;
+    color: #a0aec0;
+    border-bottom: 1px solid #1a1f2e;
+}
+
+.py-table tr:last-child td {
+    border-bottom: none;
+}
+
+.py-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.right-col {
+    text-align: right;
+}
+
+.py-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #4a5568;
+    font-size: 14px;
+    grid-column: 1 / -1;
+}
