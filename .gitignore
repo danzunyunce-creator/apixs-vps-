@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Project Specific (Sensitive & Large)
+.env
+backend/streamflow.db*
+backend/uploads/*
+backend/bin/*
+package-lock.json
+backend/package-lock.json
+tmp/
+scripts/cleanup_storage.js
+backend/scripts/cleanup_storage.js
+backend/debug_db.js

@@ -1,0 +1,63 @@
+import express from 'express';
+import * as dbLayer from '../database';
+import { authMiddleware, adminOnly } from '../middleware/auth';
+
+const router = express.Router();
+
+// 1. GET PUBLIC CONFIG (No Auth)
+router.get('/public', (req, res) => {
+    dbLayer.db.all(`SELECT key, value FROM app_config WHERE key = 'register_enabled'`, [], (err, rows: any[]) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const cfg: any = {};
+        rows.forEach(r => { cfg[r.key] = r.value; });
+        res.json(cfg);
+    });
+});
+
+// 2. GET ALL CONFIG (As Flat Object)
+router.get('/', authMiddleware, adminOnly, (req, res) => {
+    dbLayer.db.all(`SELECT * FROM app_config ORDER BY key ASC`, [], (err, rows: any[]) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const cfg: any = {};
+        rows.forEach(r => { cfg[r.key] = r.value; });
+        res.json(cfg);
+    });
+});
+
+// 3. BULK UPDATE CONFIG (Accepts Flat Object)
+router.put('/', authMiddleware, adminOnly, async (req, res) => {
+    const configData = req.body;
+    try {
+        const keys = Object.keys(configData);
+        for (const key of keys) {
+            await new Promise((resolve, reject) => {
+                dbLayer.db.run(
+                    `INSERT INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+                     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+                    [key, configData[key]],
+                    (err) => err ? reject(err) : resolve(true)
+                );
+            });
+        }
+        res.json({ message: 'Settings updated successfully' });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. SINGLE UPDATE CONFIG
+router.put('/:key', authMiddleware, adminOnly, (req, res) => {
+    const { key } = req.params;
+    const { value } = req.body;
+    dbLayer.db.run(
+        `INSERT INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+        [key, value],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: `Setting ${key} updated` });
+        }
+    );
+});
+
+export default router;

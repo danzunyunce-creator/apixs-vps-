@@ -1,16 +1,100 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,700;1,800&display=swap');
 
-:root {
+/* ═══════════════════════════════════════════════
+   DARK THEME (Default)
+═══════════════════════════════════════════════ */
+:root,
+[data-theme="dark"] {
   --font-family: 'Inter', sans-serif;
   --bg-main: #0B0E14;
   --bg-card: #121620;
+  --bg-card-hover: #171d2a;
   --border-color: #212631;
+  --border-light: #2d3748;
 
   --accent-green: #00b87c;
+  --accent-green-dim: rgba(0, 184, 124, 0.15);
   --accent-red: #ff3b3b;
+  --accent-red-dim: rgba(255, 59, 59, 0.15);
   --active-blue: #2172e5;
+  --active-blue-dim: rgba(33, 114, 229, 0.15);
+
+  --text-primary: #ffffff;
+  --text-secondary: #a0aec0;
+  --text-muted: #718096;
+  --text-dim: #4a5568;
+  --text-faint: #8b949e;
+
+  --modal-bg: #151b27;
+  --topbar-bg: #0B0E14;
+  --header-bg: var(--bg-main);
+  --input-bg: rgba(255, 255, 255, 0.03);
+  --hover-bg: rgba(255, 255, 255, 0.05);
+
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.6);
+  --shadow-glow-green: 0 0 12px rgba(0, 184, 124, 0.4);
+  --shadow-glow-red: 0 0 12px rgba(255, 59, 59, 0.4);
+  --shadow-glow-blue: 0 0 12px rgba(33, 114, 229, 0.4);
+
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+  --scrollbar-track: #151b27;
+  --scrollbar-thumb: #2d3748;
+
+  --datetime-gradient: linear-gradient(135deg, #2172e5, #00b87c);
+
+  /* Animation Tokens */
+  --shimmer-bg: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
 }
 
+/* ═══════════════════════════════════════════════
+   LIGHT THEME
+   ═══════════════════════════════════════════════ */
+[data-theme="light"] {
+  --bg-main: #f0f2f5;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8f9fb;
+  --border-color: #e2e8f0;
+  --border-light: #cbd5e1;
+
+  --accent-green: #059669;
+  --accent-green-dim: rgba(5, 150, 105, 0.1);
+  --accent-red: #dc2626;
+  --accent-red-dim: rgba(220, 38, 38, 0.1);
+  --active-blue: #2563eb;
+  --active-blue-dim: rgba(37, 99, 235, 0.1);
+
+  --text-primary: #1a202c;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
+  --text-dim: #a0aec0;
+  --text-faint: #94a3b8;
+
+  --modal-bg: #ffffff;
+  --topbar-bg: #1e293b;
+  --header-bg: #ffffff;
+  --input-bg: #f7fafc;
+  --hover-bg: rgba(0, 0, 0, 0.04);
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.15);
+  --shadow-glow-green: 0 0 12px rgba(5, 150, 105, 0.25);
+  --shadow-glow-red: 0 0 12px rgba(220, 38, 38, 0.25);
+  --shadow-glow-blue: 0 0 12px rgba(37, 99, 235, 0.25);
+
+  --overlay-bg: rgba(0, 0, 0, 0.4);
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+
+  --datetime-gradient: linear-gradient(135deg, #2563eb, #059669);
+
+  /* Animation Tokens */
+  --shimmer-bg: linear-gradient(90deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.05) 75%);
+}
+
+/* ═══════════════════════════════════════════════
+   GLOBAL RESET
+   ═══════════════════════════════════════════════ */
 * {
   margin: 0;
   padding: 0;
@@ -20,10 +104,11 @@
 body {
   font-family: var(--font-family);
   background-color: var(--bg-main);
-  color: #ffffff;
+  color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.5;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 button {
@@ -39,6 +124,48 @@ a {
   text-decoration: none;
 }
 
-input {
+input,
+select {
   font-family: inherit;
+}
+
+/* Skeleton Shimmer Animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: var(--shimmer-bg);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: 4px;
+  display: block;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+/* Smooth transitions for theme switching */
+.app-layout,
+.main-header,
+.system-top-bar,
+.dashboard-card,
+.modal-box,
+.form-input,
+.nav-btn,
+.data-table th,
+.data-table td {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
