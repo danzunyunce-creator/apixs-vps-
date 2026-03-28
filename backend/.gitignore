@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+streamflow.db
+streamflow.db-shm
+streamflow.db-wal
+uploads/
+bin/
+*.log
+.DS_Store
