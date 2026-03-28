@@ -22,35 +22,41 @@ export const clearAuth = () => {
 };
 
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const apiCache = new Map<string, { data: any, timestamp: number }>();
+const CACHE_TTL = 60 * 1000; // 60 seconds
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
+    const isGet = !options.method || options.method.toUpperCase() === 'GET';
+    const cacheKey = `${endpoint}-${JSON.stringify(options.body || '')}`;
+
+    // Cache lookup for GET requests only
+    if (isGet) {
+        const cached = apiCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+            console.log(`[API Cache] Hit for ${endpoint}`);
+            return cached.data;
+        }
+    }
+
     const token = getAuthToken();
-    
-    // Ensure endpoint is full URL if BASE_URL exists
     const fullUrl = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
     
-    // Merge headers
     const headers = {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...((options.headers as any) || {}),
     };
 
-    // Remove Content-Type if body is FormData (to let browser set boundary)
     if (options.body instanceof FormData) {
         delete (headers as any)['Content-Type'];
     }
 
     try {
-        const response = await fetch(fullUrl, {
-            ...options,
-            headers,
-        });
+        const response = await fetch(fullUrl, { ...options, headers });
 
         if (response.status === 401) {
-            console.warn('[API] Unauthorized access detected, logging out...');
             clearAuth();
-            throw new Error('Sesi berakhir. Silakan login kembali.');
+            throw new Error('Sesi berakhir.');
         }
 
         if (!response.ok) {
@@ -58,13 +64,22 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
 
-        // Check if it's a file download (backup)
         const contentType = response.headers.get('content-type');
         if (contentType && (contentType.includes('application/octet-stream') || contentType.includes('application/x-sqlite3'))) {
             return response.blob();
         }
 
-        return await response.json();
+        const result = await response.json();
+        
+        // Cache storing for GET requests
+        if (isGet) {
+            apiCache.set(cacheKey, { data: result, timestamp: Date.now() });
+        } else {
+            // Clear cache for write operations to maintain consistency
+            apiCache.clear();
+        }
+
+        return result;
     } catch (error: any) {
         console.error(`[API Error] ${endpoint}:`, error);
         throw error;

@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import compression from 'compression';
 
 import * as dbLayer from './database';
 import StreamManager from './streamManager';
@@ -20,6 +21,7 @@ import settingsRoutes from './routes/settings';
 import nodesRoutes from './routes/nodes'; // Added import for nodesRoutes
 
 const app = express();
+app.use(compression());
 app.use(cors());
 app.use(express.json());
 
@@ -41,8 +43,22 @@ app.use('/api/media', createMediaRouter(io));
 app.use('/api/streams', createStreamRouter(streamManager, io));
 app.use('/api/schedules', createScheduleRouter(streamManager, io));
 app.use('/api/automation', createAutomationRouter(autoEngine));
-app.use('/api/config', settingsRoutes);
 app.use('/api/nodes', nodesRoutes);
+app.use('/api/config', settingsRoutes);
+
+// ── Serve Frontend (dist/ folder) ──
+const DIST_PATH = path.join(__dirname, 'dist');
+if (fs.existsSync(DIST_PATH)) {
+    app.use(express.static(DIST_PATH));
+}
+
+// ── Serve Frontend Fallback ──
+app.use((req, res, next) => {
+    if (fs.existsSync(DIST_PATH) && !req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+        return res.sendFile(path.join(DIST_PATH, 'index.html'));
+    }
+    next();
+});
 
 // ── Startup Cleanup ──
 const cleanupTempFiles = () => {

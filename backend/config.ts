@@ -26,7 +26,12 @@ const config: Config = {
   FRONTEND_DIST: path.join(__dirname, '../dist'),
   API_PREFIX: '/api',
   JWT_SECRET: process.env.JWT_SECRET || 'apixs_secret_key_2024_secure',
-  FFMPEG_PATH: process.env.FFMPEG_PATH || (fs.existsSync(path.join(__dirname, 'bin/ffmpeg.exe')) ? path.join(__dirname, 'bin/ffmpeg.exe') : 'ffmpeg'),
+  FFMPEG_PATH: process.env.FFMPEG_PATH || (
+    fs.existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 
+    fs.existsSync('/usr/local/bin/ffmpeg') ? '/usr/local/bin/ffmpeg' : 
+    fs.existsSync(path.join(__dirname, 'bin/ffmpeg.exe')) ? path.join(__dirname, 'bin/ffmpeg.exe') : 
+    'ffmpeg'
+  ),
   TELEGRAM: {
     TEST_MSG: '🔴 <b>Test Notifikasi ApixsLive</b>\n\nKonfigurasi Telegram berhasil terhubung!'
   }
