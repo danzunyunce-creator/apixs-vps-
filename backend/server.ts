@@ -12,7 +12,7 @@ import config from './config';
 
 // ── Routes ──
 import authRoutes from './routes/auth';
-import mediaRoutes from './routes/media';
+import createMediaRouter from './routes/media';
 import { createStreamRouter } from './routes/streams';
 import { createScheduleRouter } from './routes/schedules';
 import { createAutomationRouter } from './routes/automation';
@@ -37,7 +37,7 @@ streamManager.attachAutomationEngine(autoEngine);
 
 // ── API Routing ──
 app.use('/api/auth', authRoutes);
-app.use('/api/media', mediaRoutes);
+app.use('/api/media', createMediaRouter(io));
 app.use('/api/streams', createStreamRouter(streamManager, io));
 app.use('/api/schedules', createScheduleRouter(streamManager, io));
 app.use('/api/automation', createAutomationRouter(autoEngine));

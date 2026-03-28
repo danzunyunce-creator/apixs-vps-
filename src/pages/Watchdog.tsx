@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
-import { apiFetch } from '../api';
+import { apiFetch, BASE_URL } from '../api';
 import './ModuleCommon.css';
 
-const SOCKET_URL = window.location.origin.replace('5173', '3001'); // Handle Vite proxy mismatch
+const SOCKET_URL = BASE_URL || window.location.origin.replace('5173', '3001');
 
 export default function Watchdog() {
     const [logs, setLogs] = useState<any[]>([]);

@@ -6,9 +6,14 @@ import { exec } from 'child_process';
 import * as dbLayer from '../database';
 import config from '../config';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { Server } from 'socket.io';
+import { MediaProcessor } from '../utils/mediaProcessor';
 
 const router = express.Router();
 const UPLOADS_DIR = config.UPLOADS_DIR;
+
+export default function createMediaRouter(io: Server) {
+    const mediaProcessor = new MediaProcessor(io);
 
 // Multer Config
 const videoStorage = multer.diskStorage({
@@ -115,21 +120,24 @@ router.post('/videos/upload', authMiddleware, uploadVideo.array('videos', 10), a
 });
 
 // 3. PROCESS VIDEO (OPTIMIZE)
-router.post('/videos/:id/process', authMiddleware, (req: AuthRequest, res) => {
+router.post('/videos/:id/process', authMiddleware, async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { targetRes } = req.body; // e.g. 720, 1080
     
-    dbLayer.db.get(`SELECT filepath FROM videos WHERE id = ?`, [id], (err, row: any) => {
+    dbLayer.db.get(`SELECT filepath FROM videos WHERE id = ?`, [id], async (err, row: any) => {
         if (!row) return res.status(404).json({ error: 'Video not found' });
         
-        const input = row.filepath;
-        const output = input.replace(/\.[^.]+$/, `_proc_${targetRes}p.mp4`);
-        const scale = targetRes === '720' ? '1280:720' : '1920:1080';
-        
-        exec(`ffmpeg -i "${input}" -vf "scale=${scale}:force_original_aspect_ratio=decrease,pad=${scale}:(ow-iw)/2:(oh-ih)/2" -vcodec libx264 -crf 23 -preset fast -acodec aac "${output}" -y`, (err) => {
-            if (err) return res.status(500).json({ error: 'FFmpeg processing failed' });
-            res.json({ message: 'Optimization completed', path: output });
-        });
+        try {
+            const input = row.filepath;
+            // The process is handled in background by mediaProcessor
+            const resStr = String(targetRes || '720');
+            mediaProcessor.compressVideo(id as string, input as string, resStr)
+                .catch(err => console.error(`[Process Error] ${id}:`, err));
+
+            res.json({ message: 'Optimization started in background', id });
+        } catch (err: any) {
+            res.status(500).json({ error: 'Failed to start processing: ' + err.message });
+        }
     });
 });
 
@@ -223,4 +231,5 @@ router.post('/playlists', authMiddleware, (req: AuthRequest, res) => {
     );
 });
 
-export default router;
+    return router;
+}

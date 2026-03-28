@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../api';
 import io from 'socket.io-client';
-import './UltimateAutomation.css';
+import { BASE_URL } from '../api';
 
-const SOCKET_URL = window.location.origin.replace('5173', '3001');
+const SOCKET_URL = BASE_URL || window.location.origin.replace('5173', '3001');
 
 export default function UltimateAutomation() {
     const [accounts, setAccounts] = useState<any[]>([]);

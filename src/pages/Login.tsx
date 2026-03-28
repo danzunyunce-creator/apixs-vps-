@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import './Login.css';
+import { BASE_URL } from '../api';
 
 // SVG Icons
 const UserIcon = () => (
@@ -105,7 +106,7 @@ export default function Login({ onLogin }: LoginProps) {
         const timer = setTimeout(() => usernameRef.current?.focus(), 300);
         
         // Fetch config to check if registration is enabled
-        fetch('/api/settings/public')
+        fetch(`${BASE_URL}/api/settings/public`)
             .then(r => r.json())
             .then(d => {
                 if (d.register_enabled === 'false') setRegEnabled(false);
@@ -130,7 +131,7 @@ export default function Login({ onLogin }: LoginProps) {
 
         try {
             if (isRegistering) {
-                const response = await fetch('/api/auth/register', {
+                const response = await fetch(`${BASE_URL}/api/auth/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
@@ -147,7 +148,7 @@ export default function Login({ onLogin }: LoginProps) {
                     }, 1200);
                 }
             } else {
-                const response = await fetch('/api/auth/login', {
+                const response = await fetch(`${BASE_URL}/api/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })

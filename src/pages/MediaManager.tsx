@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { apiFetch } from '../api';
+import VideoCompressor from '../components/VideoCompressor';
 import './MediaManager.css';
 
 interface Video {
@@ -22,6 +23,8 @@ export default function MediaManager() {
     const [logs, setLogs] = useState<{time: string, msg: string, type: 'info'|'success'|'error'}[]>([]);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [autoCompress, setAutoCompress] = useState(true);
+    const [compressingFile, setCompressingFile] = useState<File | null>(null);
 
     const log = (msg: string, type: 'info'|'success'|'error' = 'info') => {
         const time = new Date().toLocaleTimeString('id-ID');
@@ -34,6 +37,11 @@ export default function MediaManager() {
         setUploading(true);
         setCurrentStep(1);
         log(`Memulai upload ${files.length} file...`, 'info');
+
+        if (autoCompress) {
+            setCompressingFile(files[0]); // For now, compress one at a time for demo/UI simplicity
+            return;
+        }
 
         const formData = new FormData();
         Array.from(files).forEach(f => formData.append('videos', f));
@@ -61,6 +69,38 @@ export default function MediaManager() {
         } finally {
             setUploading(false);
             setProgress(0);
+        }
+    };
+
+    const onCompressionComplete = async (compressedFile: File, stats: { original: number, compressed: number }) => {
+        setCompressingFile(null);
+        setUploading(true);
+        log(`Kompresi selesai! Hemat ${( (stats.original - stats.compressed) / 1024 / 1024 ).toFixed(2)} MB. Memulai upload...`, 'success');
+
+        const formData = new FormData();
+        formData.append('videos', compressedFile);
+
+        try {
+            const data = await apiFetch('/api/media/videos/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (data.results) {
+                const successful = data.results.filter((r: any) => r.success);
+                log(`Hasil kompresi berhasil diunggah.`, 'success');
+                
+                const allVideos = await apiFetch('/api/media/videos');
+                const uploadedIds = successful.map((s: any) => s.id);
+                const newVideos = allVideos.filter((v: any) => uploadedIds.includes(v.id));
+                
+                setPlaylist(prev => [...prev, ...newVideos]);
+                setCurrentStep(2);
+            }
+        } catch (err: any) {
+             log(`Gagal mengunggah file hasil kompresi: ${err.message}`, 'error');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -169,8 +209,24 @@ export default function MediaManager() {
                                 <small>Maksimal 10 file sekaligus</small>
                             </label>
                             {uploading && <div className="upload-loader-bar" />}
+                            
+                            <div className="compress-toggle">
+                                <label className="fancy-toggle">
+                                    <input type="checkbox" checked={autoCompress} onChange={() => setAutoCompress(!autoCompress)} />
+                                    <span className="slider" />
+                                </label>
+                                <span>Auto-Compress (Local)</span>
+                            </div>
                         </div>
                     </div>
+
+                    {compressingFile && (
+                        <VideoCompressor 
+                            file={compressingFile} 
+                            onComplete={onCompressionComplete} 
+                            onCancel={() => setCompressingFile(null)} 
+                        />
+                    )}
 
                     {/* STEP 2 AREA */}
                     <div className={`action-card ${currentStep === 2 ? 'focus' : (currentStep < 2 ? 'locked' : '')}`}>

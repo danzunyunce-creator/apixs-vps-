@@ -21,8 +21,13 @@ export const clearAuth = () => {
     window.location.reload();
 };
 
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     const token = getAuthToken();
+    
+    // Ensure endpoint is full URL if BASE_URL exists
+    const fullUrl = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
     
     // Merge headers
     const headers = {
@@ -37,7 +42,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     }
 
     try {
-        const response = await fetch(endpoint, {
+        const response = await fetch(fullUrl, {
             ...options,
             headers,
         });
