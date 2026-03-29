@@ -66,6 +66,7 @@ export class AutomationEngine {
     private async runHourlyTasks() {
         // Buang Sampah (Cleanup)
         this.trashCleanup();
+        dbLayer.rotateLogs(2000); // Bertambah: Simpan 2000 log terakhir setiap jam
         
         if (await this.isRuleEnabled('Health Pulse Monitoring')) {
             this.sendHealthPulse();
