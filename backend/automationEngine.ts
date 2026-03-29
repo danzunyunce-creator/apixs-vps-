@@ -83,7 +83,13 @@ export class AutomationEngine {
 
     private async sendHealthPulse() {
         const activeCount = this.sm.activeStreams.size;
-        let message = `💓 <b>Apixs Health Pulse:</b> System OK.\nStreams Active: <b>${activeCount}</b>\nServer Uptime: <b>${Math.floor(process.uptime() / 3600)}h</b>`;
+        const memory = process.memoryUsage();
+        const heapUsedMB = Math.round(memory.heapUsed / 1024 / 1024);
+        
+        let message = `💓 <b>Apixs Health Pulse:</b> System OK.\n` +
+                      `Streams Active: <b>${activeCount}</b>\n` +
+                      `Node Heap: <b>${heapUsedMB} MB</b>\n` +
+                      `Server Uptime: <b>${Math.floor(process.uptime() / 3600)}h</b>`;
         
         if (activeCount > 0) {
             message += `\n\n<b>Details:</b>`;
@@ -116,6 +122,18 @@ export class AutomationEngine {
                 const refreshMsg = `[Auto-Refresh] Penonton terdeteksi 0 selama >5 menit. Memutar ulang konten untuk <b>${id}</b>.`;
                 this.sm.emitLog(id, 'warn', refreshMsg);
                 dbLayer.saveSystemLog('AUTOMATION', 'warn', refreshMsg).catch(() => {});
+                this.rotateCooldown.set(id, now);
+                this.rotateScheduledStream(id.replace('sched-', ''));
+            }
+
+            // --- DEEP FORENSIC: Frozen Watchdog (Phase 2) ---
+            const lastData = (desc as any).lastDataTime || now;
+            const idleSeconds = (now - lastData) / 1000;
+            if (idleSeconds > 60 && runningMinutes > 1 && cooldownOk) {
+                const stallMsg = `🚨 [Anti-Stall] Stream terdeteksi MEMBEKU (Frozen) selama 60 detik. Melakukan pemulihan darurat...`;
+                this.sm.emitLog(id, 'error', stallMsg);
+                dbLayer.saveSystemLog(id, 'error', stallMsg).catch(() => {});
+                telegramService.sendMessage(`🧊 <b>FROZEN ALERT:</b> Stream <i>${id}</i> macet. Memulai ulang...`).catch(() => {});
                 this.rotateCooldown.set(id, now);
                 this.rotateScheduledStream(id.replace('sched-', ''));
             }

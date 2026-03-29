@@ -318,8 +318,9 @@ export function rotateSessions(daysBack: number = 30): void {
   db.run(`DELETE FROM stream_sessions WHERE start_time < datetime('now', '-${daysBack} days')`, [], (err) => {
     if (err) console.error('[Database] Failed to rotate sessions:', err);
     else {
-      console.log(`[Database] Old sessions (> ${daysBack} days) purged. Running VACUUM...`);
-      db.run('VACUUM'); // Root-level optimization to shrink file size
+      console.log(`[Database] Old sessions (> ${daysBack} days) purged. Running VACUUM & WAL Checkpoint...`);
+      db.run('VACUUM'); // Root-level optimization
+      db.run('PRAGMA wal_checkpoint(TRUNCATE)'); // Force WAL truncate to save disk space
     }
   });
 }

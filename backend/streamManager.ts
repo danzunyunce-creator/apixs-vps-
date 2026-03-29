@@ -32,6 +32,7 @@ export interface StreamDesc {
     restartCount: number;
     bitrate: string;
     meta: StreamMeta;
+    lastDataTime: number; // For Frozen Watchdog
 }
 
 export class StreamManager {
@@ -244,7 +245,8 @@ export class StreamManager {
                 viewers: 0,
                 restartCount: currentRestartCount,
                 bitrate: '0 kbps',
-                meta: meta
+                meta: meta,
+                lastDataTime: Date.now()
             };
 
             this.activeStreams.set(id, streamDesc);
@@ -280,6 +282,7 @@ export class StreamManager {
                 const bitrateMatch = textChunk.match(/bitrate=\s*([\d.]+kbits\/s)/i);
                 if (bitrateMatch && desc) {
                     desc.bitrate = bitrateMatch[1].replace('kbits', ' kbps');
+                    desc.lastDataTime = now; // Update heartbeat on data
                     const diffS = Math.floor((now - desc.startedAt) / 1000);
                     const h = Math.floor(diffS / 3600);
                     const m = Math.floor((diffS % 3600) / 60);

@@ -1,6 +1,9 @@
 import { google, youtube_v3 } from 'googleapis';
 import * as dbLayer from './database';
 import { telegramService } from './telegramService';
+import https from 'https';
+
+const httpsAgent = new https.Agent({ keepAlive: true });
 
 class YoutubeApiManager {
     private quotaLockUntil: number | null = null;
@@ -69,6 +72,9 @@ class YoutubeApiManager {
                 cfg.yt_client_secret,
                 REDIRECT_URL
             );
+
+            // Optimization: Keep-alive for low-latency API calls
+            (oauth2Client as any).transporter.defaults.httpsAgent = httpsAgent;
 
             oauth2Client.setCredentials({ refresh_token: channel.refresh_token });
 
