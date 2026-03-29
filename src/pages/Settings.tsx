@@ -244,8 +244,21 @@ export default function Settings() {
 
                     {activeTab === 'ai' && (
                         <section className="card glass-premium">
-                            <h3>🧠 Smart AI Settings</h3>
+                            <h3>🧠 Smart AI Settings (GPT-4o)</h3>
+                            <p className="text-muted">Konfigurasi otak AI untuk optimasi konten otomatis.</p>
+                            
                             <div className="field" style={{ marginTop: '15px' }}>
+                                <label>OpenAI API Key (GPT-4o) 🔑</label>
+                                <input 
+                                    type="password" 
+                                    value={config.openai_api_key || ''} 
+                                    onChange={e => setConfig({...config, openai_api_key: e.target.value})} 
+                                    placeholder="sk-proj-..."
+                                />
+                                <small style={{ color: '#94a3b8' }}>Dapatkan di platform.openai.com. Pastikan saldo mencukupi.</small>
+                            </div>
+
+                            <div className="field">
                                 <label>AI Writing Tone</label>
                                 <select value={config.ai_tone || 'viral'} onChange={e => setConfig({...config, ai_tone: e.target.value})}>
                                     <option value="formal">Formal & Profesional</option>
@@ -253,6 +266,18 @@ export default function Settings() {
                                     <option value="clickbait">High Click-through Rate</option>
                                 </select>
                             </div>
+
+                            <div className="field">
+                                <label>AI Prompt Template 🪄</label>
+                                <textarea 
+                                    style={{ height: '80px', padding: '10px' }}
+                                    value={config.ai_prompt_template || ''} 
+                                    onChange={e => setConfig({...config, ai_prompt_template: e.target.value})}
+                                    placeholder="Buat judul viral, deskripsi SEO untuk: {title}"
+                                />
+                                <small style={{ color: '#94a3b8' }}>Gunakan tag {'{title}'} sebagai placeholder judul video master.</small>
+                            </div>
+
                             <div className="field">
                                 <label className="checkbox-label">
                                     <input type="checkbox" checked={config.auto_generate === 'true'} onChange={e => setConfig({...config, auto_generate: e.target.checked ? 'true' : 'false'})} />
@@ -268,6 +293,16 @@ export default function Settings() {
                             <div className="field" style={{ marginTop: '15px' }}>
                                 <label>Storage Library Path</label>
                                 <input type="text" value={config.storage_path || 'backend/uploads'} onChange={e => setConfig({...config, storage_path: e.target.value})} />
+                            </div>
+                            
+                            <div className="field">
+                                <label>Global Bandwidth Limit (Mbps) ⚡</label>
+                                <input 
+                                    type="number" 
+                                    value={config.bandwidth_limit_mbps || 100} 
+                                    onChange={e => setConfig({...config, bandwidth_limit_mbps: e.target.value})} 
+                                />
+                                <small style={{ color: '#94a3b8' }}>Membatasi total bitrate seluruh stream aktif untuk menjaga stabilitas VPS.</small>
                             </div>
                             
                             <hr style={{ margin: '20px 0', opacity: 0.1 }} />
