@@ -703,3 +703,21 @@ input[type="text"], input[type="password"], input[type="number"], input[type="da
 @media (max-width: 1000px) {
     .dashboard-charts-row { grid-template-columns: 1fr; }
 }
+
+/* Global Clear Buttons */
+.btn-clear, .btn-clear-logs, .btn-clear-all {
+    background: #334155;
+    color: #f8fafc;
+    border: 1px solid #475569;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-clear:hover, .btn-clear-logs:hover, .btn-clear-all:hover {
+    background: #475569;
+    color: #ffffff;
+}
