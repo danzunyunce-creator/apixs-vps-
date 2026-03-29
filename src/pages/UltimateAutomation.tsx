@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../api';
 import io from 'socket.io-client';
 import { BASE_URL } from '../api';
+import './UltimateAutomation.css';
 
 const SOCKET_URL = BASE_URL || window.location.origin.replace('5173', '3001');
 
