@@ -174,7 +174,8 @@ export class AutomationEngine {
                             channel_name: schedule.name,
                             niche: schedule.name,
                             is_concat: !!schedule.playlist_path,
-                            loop_mode: 'repeat_all'
+                            loop_mode: 'repeat_all',
+                            youtube_account_id: schedule.youtube_account_id
                         };
 
                         if (!node || node.id === 'node-1') {

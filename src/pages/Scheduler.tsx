@@ -10,6 +10,7 @@ interface Schedule {
     status: string;
     stream_key?: string;
     playlist_path?: string;
+    youtube_account_id?: string;
     is_recurring?: number;
     stream_id?: string;
 }
@@ -56,6 +57,7 @@ export default function Scheduler() {
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState('ALL');
     const [showForm, setShowForm] = useState(false);
+    const [channels, setChannels] = useState<any[]>([]);
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
@@ -64,6 +66,7 @@ export default function Scheduler() {
         end: '',
         stream_key: '',
         playlist_path: '',
+        youtube_account_id: '',
         is_recurring: false
     });
 
@@ -71,8 +74,12 @@ export default function Scheduler() {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await apiFetch('/api/schedules');
+            const [data, chRes] = await Promise.all([
+                apiFetch('/api/schedules'),
+                apiFetch('/api/youtube/channels').catch(() => [])
+            ]);
             setSchedules(data);
+            setChannels(chRes);
         } catch (err) {
             console.error('Failed to load schedules', err);
         } finally {
@@ -136,7 +143,7 @@ export default function Scheduler() {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', start: '', end: '', stream_key: '', playlist_path: '', is_recurring: false });
+        setFormData({ name: '', start: '', end: '', stream_key: '', playlist_path: '', youtube_account_id: '', is_recurring: false });
         setEditingId(null);
     };
 
@@ -212,9 +219,22 @@ export default function Scheduler() {
                             <input type="datetime-local" value={formData.end} onChange={e => setFormData({...formData, end: e.target.value})} />
                         </div>
                         <div className="form-item">
-                            <label>Stream Key (YouTube/FB)</label>
-                            <input value={formData.stream_key} onChange={e => setFormData({...formData, stream_key: e.target.value})} placeholder="Tinggalkan kosong jika otomatis" />
+                            <label>Target Channel</label>
+                            <select value={formData.youtube_account_id} onChange={e => {
+                                setFormData({...formData, youtube_account_id: e.target.value, stream_key: ''})
+                            }}>
+                                <option value="">🎯 Manual Stream Key</option>
+                                {channels.map(ch => (
+                                    <option key={ch.id} value={ch.id}>🔴 {ch.channel_name}</option>
+                                ))}
+                            </select>
                         </div>
+                        {!formData.youtube_account_id && (
+                            <div className="form-item">
+                                <label>Stream Key (Manual)</label>
+                                <input value={formData.stream_key} onChange={e => setFormData({...formData, stream_key: e.target.value})} placeholder="Wajib diisi jika target Manual" />
+                            </div>
+                        )}
                         <div className="form-item">
                             <label>Playlist/Video Path</label>
                             <input value={formData.playlist_path} onChange={e => setFormData({...formData, playlist_path: e.target.value})} placeholder="/path/to/video.mp4" />
@@ -268,6 +288,7 @@ export default function Scheduler() {
                                             end: s.end_time ? s.end_time.slice(0, 16) : '',
                                             stream_key: s.stream_key || '',
                                             playlist_path: s.playlist_path || '',
+                                            youtube_account_id: s.youtube_account_id || '',
                                             is_recurring: !!s.is_recurring
                                         });
                                         setShowForm(true);
@@ -293,6 +314,17 @@ export default function Scheduler() {
                                         <span title={s.playlist_path}>{s.playlist_path.split('/').pop()}</span>
                                     </div>
                                 )}
+                                {s.youtube_account_id ? (
+                                    <div className="source-info">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>
+                                        <span title="Target Channel" style={{color: '#fa5252', fontWeight:'600'}}>{channels.find(c => c.id === s.youtube_account_id)?.channel_name || 'YT Auto Channel'}</span>
+                                    </div>
+                                ) : ( s.stream_key && (
+                                    <div className="source-info" style={{ opacity: 0.7 }}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                                        <span>Manual Key</span>
+                                    </div>
+                                ))}
                             </div>
                             <div className="card-footer">
                                 {s.status === 'RUNNING' ? (

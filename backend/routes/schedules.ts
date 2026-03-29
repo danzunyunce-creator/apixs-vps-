@@ -21,14 +21,14 @@ export const createScheduleRouter = (streamManager: StreamManager, io: Server) =
 
     // 2. CREATE SCHEDULE
     router.post('/', authMiddleware, (req: AuthRequest, res) => {
-        const { name, start, end, stream_id, is_recurring, stream_key, playlist_path } = req.body;
+        const { name, start, end, stream_id, is_recurring, stream_key, playlist_path, youtube_account_id } = req.body;
         const userId = req.user!.id;
         const id = 'sched-' + Date.now();
         
         dbLayer.db.run(
-            `INSERT INTO schedules (id, name, start_time, end_time, stream_id, status, is_recurring, stream_key, playlist_path, user_id) 
-             VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?)`,
-            [id, name, start, end, stream_id, 'SCHEDULED', is_recurring ? 1 : 0, stream_key || '', playlist_path || '', userId],
+            `INSERT INTO schedules (id, name, start_time, end_time, stream_id, status, is_recurring, stream_key, playlist_path, user_id, youtube_account_id) 
+             VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?)`,
+            [id, name, start, end, stream_id, 'SCHEDULED', is_recurring ? 1 : 0, stream_key || '', playlist_path || '', userId, youtube_account_id || null],
             function (err) {
                 if (err) return res.status(500).json({ error: err.message });
                 res.json({ id, message: 'Jadwal berhasil dibuat!', status: 'SCHEDULED' });
@@ -38,12 +38,12 @@ export const createScheduleRouter = (streamManager: StreamManager, io: Server) =
 
     // 3. UPDATE SCHEDULE
     router.put('/:id', authMiddleware, (req, res) => {
-        const { name, start, end, stream_id, is_recurring, stream_key, playlist_path } = req.body;
+        const { name, start, end, stream_id, is_recurring, stream_key, playlist_path, youtube_account_id } = req.body;
         const { id } = req.params;
 
         dbLayer.db.run(
-            `UPDATE schedules SET name = ?, start_time = ?, end_time = ?, stream_id = ?, is_recurring = ?, stream_key = ?, playlist_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-            [name, start, end, stream_id, is_recurring ? 1 : 0, stream_key, playlist_path, id],
+            `UPDATE schedules SET name = ?, start_time = ?, end_time = ?, stream_id = ?, is_recurring = ?, stream_key = ?, playlist_path = ?, youtube_account_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [name, start, end, stream_id, is_recurring ? 1 : 0, stream_key, playlist_path, youtube_account_id || null, id],
             function (err) {
                 if (err) return res.status(500).json({ error: err.message });
                 res.json({ message: 'Schedule updated' });
@@ -68,7 +68,8 @@ export const createScheduleRouter = (streamManager: StreamManager, io: Server) =
                              channel_name: sched.name,
                              niche: sched.sourceName || sched.name,
                              is_concat: !!sched.playlist_path,
-                             loop_mode: 'repeat_all'
+                             loop_mode: 'repeat_all',
+                             youtube_account_id: sched.youtube_account_id
                          };
                          streamManager.startStream(`sched-${sched.id}`, meta);
                      }
@@ -115,7 +116,8 @@ export const createScheduleRouter = (streamManager: StreamManager, io: Server) =
                                 channel_name: sched.name,
                                 niche: sched.sourceName || sched.name,
                                 is_concat: !!sched.playlist_path,
-                                loop_mode: 'repeat_all'
+                                loop_mode: 'repeat_all',
+                                youtube_account_id: sched.youtube_account_id
                             };
                             streamManager.startStream(`sched-${id}`, meta);
                         }
