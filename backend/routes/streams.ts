@@ -179,6 +179,18 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
         }
     });
 
+    // 7.1 EMERGENCY STOP ALL
+    router.post('/emergency-stop', authMiddleware, adminOnly, async (req, res) => {
+        try {
+            const count = streamManager.emergencyStopAll();
+            dbLayer.db.run(`UPDATE streams SET status = 'OFFLINE' WHERE status = 'RUNNING'`);
+            dbLayer.saveSystemLog('SYSTEM', 'warn', `EMERGENCY STOP: ${count} stream dihentikan paksa.`);
+            res.json({ message: `Emergeny stop triggered. ${count} process killed.`, count });
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     // 7.1 MANAGE DESTINATIONS
     router.get('/:id/destinations', authMiddleware, (req, res) => {
         const { id } = req.params;

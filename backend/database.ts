@@ -164,6 +164,20 @@ function createTables(): Promise<void> {
         FOREIGN KEY (stream_id) REFERENCES streams(id)
       )`);
 
+      db.run(`CREATE TABLE IF NOT EXISTS admin_activities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        username TEXT,
+        action TEXT NOT NULL,
+        target_type TEXT,
+        target_id TEXT,
+        details TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )`);
+
       db.run(`CREATE TABLE IF NOT EXISTS schedules (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -207,7 +221,7 @@ function createTables(): Promise<void> {
       )`, () => {
           const defaults = [
               ['rule-1', 'Anti-Zonkz Stream', 'Restart otomatis jika penonton 0 selama 5+ menit', 'content', '🔄', '24/7 Monitoring'],
-              ['rule-2', 'Auto-SEO Niche Optimizer', 'Update Judul, Deskripsi & Tags siaran otomatis', 'schedule', '🎯', 'On Stream Start'],
+              ['rule-2', 'GPT-4o: Viral Metadata Generator', 'Otomasi judul, deskripsi & tags viral via OpenAI GPT-4o', 'schedule', '🪄', 'On Stream Start'],
               ['rule-3', 'Auto-Stop Duration', 'Matikan stream otomatis setelah 12 jam', 'notification', '⏱️', 'After 12 Hours'],
               ['rule-4', 'Health Pulse Monitoring', 'Kirim update berkala status stream ke Telegram', 'chatbot', '❤️', 'Every 1 Hour'],
               ['rule-5', 'SEO Hourly Title Rotator', 'Ganti judul berkala dengan keyword berbeda', 'schedule', '🔄', 'Every 1 Hour']
@@ -228,7 +242,8 @@ function createTables(): Promise<void> {
             { key: 'register_enabled', value: 'false' },
             { key: 'app_redirect_url', value: 'http://localhost:3001/api/youtube/oauth-callback' },
             { key: 'openai_api_key', value: '' },
-            { key: 'ai_prompt_template', value: 'Buat judul viral, deskripsi SEO, dan 10 hashtag untuk video ini: {title}' }
+            { key: 'ai_prompt_template', value: 'Buat judul viral, deskripsi SEO, dan 10 hashtag untuk video ini: {title}' },
+            { key: 'bandwidth_limit_mbps', value: '100' }
           ];
           
           keys.forEach(k => {
@@ -311,6 +326,7 @@ export async function initializeDatabase(): Promise<void> {
     // AI Migration
     db.run(`INSERT OR IGNORE INTO app_config (key, value) VALUES ('openai_api_key', '')`);
     db.run(`INSERT OR IGNORE INTO app_config (key, value) VALUES ('ai_prompt_template', 'Buat judul viral, deskripsi SEO, dan 10 hashtag untuk video ini: {title}')`);
+    db.run(`INSERT OR IGNORE INTO app_config (key, value) VALUES ('bandwidth_limit_mbps', '100')`);
   });
 
   // Seed Admin Accounts

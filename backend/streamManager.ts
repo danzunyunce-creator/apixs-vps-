@@ -144,6 +144,18 @@ export class StreamManager {
         dbLayer.updateStreamStatus(id, 'STOP').catch(console.error);
     }
 
+    public emergencyStopAll() {
+        const ids = Array.from(this.activeStreams.keys());
+        ids.forEach(id => this.stopStream(id));
+        if (this.io) {
+            this.io.emit('system_alert', { 
+                type: 'CRITICAL', 
+                message: 'EMERGENCY STOP TRIGGERED: Seluruh stream telah dihentikan oleh pusat.' 
+            });
+        }
+        return ids.length;
+    }
+
     private _buildArgs(meta: StreamMeta): string[] {
         const rtmpDest = `${meta.rtmp_url || 'rtmp://a.rtmp.youtube.com/live2'}/${meta.stream_key || ''}`;
         const inputSource = meta.filepath || meta.input_source || 'testsrc=size=1280x720';

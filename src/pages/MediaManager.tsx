@@ -18,6 +18,8 @@ export default function MediaManager() {
     const [uploading, setUploading] = useState(false);
     const [autoCompress, setAutoCompress] = useState(true);
     const [compressingFile, setCompressingFile] = useState<File | null>(null);
+    const [bulkPath, setBulkPath] = useState('');
+    const [bulkLoading, setBulkLoading] = useState(false);
 
     const loadVideos = useCallback(async () => {
         try {
@@ -87,6 +89,24 @@ export default function MediaManager() {
         }
     };
 
+    const handleBulkIngest = async () => {
+        if (!bulkPath) return alert('Masukkan path folder server!');
+        try {
+            setBulkLoading(true);
+            const res = await apiFetch('/api/automation/bulk-ingest', {
+                method: 'POST',
+                body: JSON.stringify({ folderPath: bulkPath })
+            });
+            alert(`✅ Sukses! ${res.count} video berhasil di-ingest dengan AI Metadata.`);
+            setBulkPath('');
+            loadVideos();
+        } catch (err: any) {
+            alert('Bulk Error: ' + err.message);
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
     const formatSize = (bytes: number = 0) => {
         if (bytes === 0) return '0 B';
         const k = 1024;
@@ -124,6 +144,27 @@ export default function MediaManager() {
                                 </label>
                                 <span>Auto-Compress (Lokal)</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="action-card" style={{ marginTop: 20 }}>
+                        <h3>🪄 Bulk AI Processor</h3>
+                        <p style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: 15 }}>Impor folder masif dari server & otomatiskan metadata dengan GPT-4o.</p>
+                        <div className="bulk-form">
+                            <input 
+                                type="text" 
+                                placeholder="Server Path (ex: D:/Videos/Viral)" 
+                                value={bulkPath}
+                                onChange={e => setBulkPath(e.target.value)}
+                                className="bulk-input"
+                            />
+                            <button 
+                                className={`btn-bulk ${bulkLoading ? 'loading' : ''}`}
+                                onClick={handleBulkIngest}
+                                disabled={bulkLoading}
+                            >
+                                {bulkLoading ? 'Processing...' : 'Start Bulk AI Ingest'}
+                            </button>
                         </div>
                     </div>
 

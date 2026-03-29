@@ -34,6 +34,7 @@ export default function Dashboard() {
     const [cpuHistory, setCpuHistory] = useState<any[]>([]);
     const [memoryHistory, setMemoryHistory] = useState<any[]>([]);
     const [recentLogs, setRecentLogs] = useState<any[]>([]);
+    const [activities, setActivities] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [now, setNow] = useState(new Date());
 
@@ -72,6 +73,23 @@ export default function Dashboard() {
             });
         });
 
+        socket.on('stream_metrics', (metricsUpdate: any) => {
+            setStreams(prev => prev.map(s => {
+                if (metricsUpdate[s.id]) {
+                    return { ...s, ...metricsUpdate[s.id], status: 'OK' };
+                }
+                return s;
+            }));
+        });
+
+        socket.on('system_alert', (alert: any) => {
+            toast(alert.message, {
+                icon: '🚨',
+                duration: 6000,
+                style: { border: '2px solid #ef4444', color: '#ef4444' }
+            });
+        });
+
         // Initial Load for static data
         const initialLoad = async () => {
             try {
@@ -86,6 +104,7 @@ export default function Dashboard() {
                 }));
                 setStreams(data.activeStreams || []);
                 setRecentLogs(data.recentLogs || []);
+                setActivities(data.activities || []);
             } catch (err) {
                 console.error('Failed to load initial dashboard data', err);
             } finally {
@@ -187,39 +206,56 @@ export default function Dashboard() {
             </div>
 
             {/* LIVE STREAMS TABLE */}
-            <div className="recent-activity card glass-premium" style={{ marginTop: '20px' }}>
-                <div className="activity-header-compact">
-                    <h3>📹 REAL-TIME STREAM METRICS</h3>
-                    <span className="metrics-count">{streams.length} INSTANCES</span>
-                </div>
-                <div className="compact-table-wrapper">
-                    <table className="compact-monitoring-table">
-                        <thead>
-                            <tr>
-                                <th>STREAM ID</th>
-                                <th>CPU</th>
-                                <th>BITRATE</th>
-                                <th>FPS</th>
-                                <th>STATUS</th>
-                                <th>ACTION</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {streams.map(s => (
-                                <tr key={s.id}>
-                                    <td className="st-id">{s.id}</td>
-                                    <td><div className="mini-progress"><div className="mini-fill" style={{ width: `${s.cpu}%` }}></div></div> {s.cpu}%</td>
-                                    <td className="st-br">{s.bitrate} kbps</td>
-                                    <td className="st-fps">{s.fps}</td>
-                                    <td><span className={`status-pill-small ${s.status === 'OK' ? 'ok' : 'err'}`}>{s.status}</span></td>
-                                    <td>
-                                        <button className="btn-mini-restart" onClick={() => triggerRestart(s.id)}>🔄 RESTART</button>
-                                    </td>
+            <div className="recent-activity-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', marginTop: '20px' }}>
+                <div className="recent-activity card glass-premium">
+                    <div className="activity-header-compact">
+                        <h3>📹 REAL-TIME STREAM METRICS</h3>
+                        <span className="metrics-count">{streams.length} INSTANCES</span>
+                    </div>
+                    <div className="compact-table-wrapper">
+                        <table className="compact-monitoring-table">
+                            <thead>
+                                <tr>
+                                    <th>STREAM ID</th>
+                                    <th>CPU</th>
+                                    <th>BITRATE</th>
+                                    <th>STATUS</th>
+                                    <th>ACTION</th>
                                 </tr>
-                            ))}
-                            {streams.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', opacity: 0.5, padding: '20px' }}>No active streams detected.</td></tr>}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {streams.map(s => (
+                                    <tr key={s.id}>
+                                        <td className="st-id">{s.id}</td>
+                                        <td><div className="mini-progress"><div className="mini-fill" style={{ width: `${s.cpu}%` }}></div></div> {s.cpu}%</td>
+                                        <td className="st-br">{s.bitrate || '0'} kbps</td>
+                                        <td><span className={`status-pill-small ${s.status === 'OK' ? 'ok' : 'err'}`}>{s.status}</span></td>
+                                        <td>
+                                            <button className="btn-mini-restart" onClick={() => triggerRestart(s.id)}>🔄</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {streams.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', opacity: 0.5, padding: '20px' }}>No active streams.</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div className="recent-activity card glass-premium">
+                    <div className="activity-header-compact">
+                        <h3>📜 SYSTEM ACTIVITY LOG</h3>
+                        <span className="metrics-count">LATEST</span>
+                    </div>
+                    <div className="activities-list">
+                        {activities.map((a, i) => (
+                            <div key={i} className="activity-row-minimal">
+                                <span className="a-time">{new Date(a.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                                <span className="a-user">{a.username || 'SYS'}</span>
+                                <span className="a-action">{a.action}</span>
+                                <span className="a-target">{a.target_id}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

@@ -165,12 +165,23 @@ export const createAutomationRouter = (autoEngine: AutomationEngine) => {
         }
     });
 
-    // 5a. AI METADATA WIZARD
     router.post('/ai-metadata', authMiddleware, async (req, res) => {
         const { title } = req.body;
         try {
             const aiData = await AIService.generateMetadata(title);
             res.json(aiData);
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // 5b. BULK AI INGESTION
+    router.post('/bulk-ingest', authMiddleware, async (req, res) => {
+        const { folderPath } = req.body;
+        const userId = (req as any).user.id;
+        try {
+            const count = await autoEngine.processFolderWithAI(folderPath, userId);
+            res.json({ message: `Successfully ingested ${count} videos with AI metadata.`, count });
         } catch (err: any) {
             res.status(500).json({ error: err.message });
         }

@@ -33,6 +33,9 @@ export default function YTAutomation() {
     const [logs, setLogs] = useState<AutoLog[]>([]);
     const [stats, setStats] = useState({ active: 0, completed: 0, errors: 0 });
     const [isRunning, setIsRunning] = useState(false);
+    const [aiInput, setAiInput] = useState('');
+    const [aiResult, setAiResult] = useState<any>(null);
+    const [aiLoading, setAiLoading] = useState(false);
     const logEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -113,7 +116,7 @@ export default function YTAutomation() {
 
             const seoRes = await apiFetch('/api/automation/seo', {
                 method: 'POST',
-                body: JSON.stringify({ videoId })
+                body: JSON.stringify({ videoId, title: file.name })
             });
             update({ stage: 'THUMB', progress: 50, results: { ...seoRes, videoId } });
 
@@ -152,6 +155,22 @@ export default function YTAutomation() {
             update({ stage: 'COMPLETE', progress: 100 });
         } catch (err: any) {
             update({ stage: 'ERROR', error: err.message, progress: 0 });
+        }
+    };
+
+    const handleAIGenerate = async () => {
+        if (!aiInput) return;
+        try {
+            setAiLoading(true);
+            const res = await apiFetch('/api/automation/ai-metadata', {
+                method: 'POST',
+                body: JSON.stringify({ title: aiInput })
+            });
+            setAiResult(res);
+        } catch (e: any) {
+            alert('AI Error: ' + e.message);
+        } finally {
+            setAiLoading(false);
         }
     };
 
@@ -222,6 +241,7 @@ export default function YTAutomation() {
                                 <div className="mj-header">
                                     <span className="mj-icon">{getStageIcon(job.stage)}</span>
                                     <span className="mj-name">{job.filename}</span>
+                                    <span className="mj-label">{job.stage === 'SEO' ? 'GPT-4o IS THINKING...' : job.stage}</span>
                                     <span className="mj-pct">{job.progress}%</span>
                                 </div>
                                 <div className="mj-bar">
@@ -240,6 +260,38 @@ export default function YTAutomation() {
                 {/* COLUMN 2: AI BRAIN RULES */}
                 <div className="master-col rules-col">
                     <div className="col-header">
+                        <span className="col-icon">🪄</span>
+                        <h3>GPT-4o AI Wizard</h3>
+                    </div>
+                    
+                    <div className="gpt-wizard-toolbox card">
+                        <p>Dapatkan saran metadata viral instan dari GPT-4o berdasarkan topik video Anda.</p>
+                        <div className="gpt-input-row">
+                            <input 
+                                type="text" 
+                                placeholder="Masukkan Niche (misal: Live Skor Bola)" 
+                                value={aiInput}
+                                onChange={e => setAiInput(e.target.value)}
+                            />
+                            <button 
+                                className={`btn-gpt-gen ${aiLoading ? 'loading' : ''}`}
+                                onClick={handleAIGenerate}
+                                disabled={aiLoading}
+                            >
+                                {aiLoading ? '🪄 Thinking...' : '✨ Generate'}
+                            </button>
+                        </div>
+                        {aiResult && (
+                            <div className="gpt-result-box fade-in">
+                                <span className="res-label">PROPOSED TITLE</span>
+                                <div className="res-content">{aiResult.title}</div>
+                                <span className="res-label">SEO DESCRIPTION</span>
+                                <div className="res-content desc">{aiResult.description}</div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="col-header" style={{ marginTop: 20 }}>
                         <span className="col-icon">🧠</span>
                         <h3>Engine Logic Rules</h3>
                     </div>

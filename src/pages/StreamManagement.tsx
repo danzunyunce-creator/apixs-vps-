@@ -33,6 +33,7 @@ export default function StreamManagement() {
     const [schedules, setSchedules] = useState<Schedule[]>([]);
     const [logs, setLogs] = useState<{time: string, msg: string, type: 'info'|'warn'|'error'|'success'}[]>([]);
     const [loading, setLoading] = useState(false);
+    const [showAddModal, setShowAddModal] = useState(false);
     const [allVideos, setAllVideos] = useState<any[]>([]);
     const [aiLoading, setAiLoading] = useState(false);
     const [newStream, setNewStream] = useState({
@@ -103,6 +104,20 @@ export default function StreamManagement() {
             loadAll();
         } catch (err: any) {
             addLog(`Error ${action}: ${err.message}`, 'error');
+        }
+    };
+
+    const handleMasterStop = async () => {
+        if (!window.confirm('🚨 PERINGATAN KRITIKAL: Anda akan mematikan SELURUH stream di SEMUA node. Lanjutkan?')) return;
+        try {
+            setLoading(true);
+            await apiFetch('/api/streams/emergency-stop', { method: 'POST' });
+            addLog('MASTER STOP: Seluruh stream telah dihentikan!', 'error');
+            loadAll();
+        } catch (err: any) {
+            alert('Gagal Master Stop: ' + err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -197,6 +212,10 @@ export default function StreamManagement() {
                     <button className="btn-add-stream" onClick={() => setShowAddModal(true)}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         New Stream
+                    </button>
+                    <button className="btn-panic" onClick={handleMasterStop}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        Panic Stop
                     </button>
                     <button className="btn-refresh" onClick={loadAll} disabled={loading}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>

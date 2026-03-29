@@ -24,6 +24,7 @@ export class AutomationEngine {
         setInterval(() => this.syncLiveViewers(), 300000); // 5 Minutes
         setInterval(() => this.watchEmptyViewers(), 600000); // 10 Minutes
         setInterval(() => this.runHourlyTasks(), 3600000); // 1 Hour
+        setInterval(() => this.checkNodeHealthAndFailover(), 60000); // 1 Minute
     }
 
     private async syncLiveViewers() {
@@ -459,19 +460,78 @@ export class AutomationEngine {
         });
     }
 
-    onStreamStop(streamId: string) {
-        // Clear Cooldown Entry (Memory Leak Fix)
-        if (this.rotateCooldown.has(streamId)) {
-            this.rotateCooldown.delete(streamId);
-            console.log(`[AutomationEngine] Memory cleanup: rotateCooldown for ${streamId} purged.`);
-        }
+    async checkNodeHealthAndFailover() {
+        if (!(await this.isRuleEnabled('Auto-Node Failover'))) return;
+        
+        dbLayer.db.all(`SELECT * FROM nodes WHERE status = 'OFFLINE' AND last_seen < datetime('now', '-2 minutes')`, [], async (err, deadNodes: any[]) => {
+            if (err || !deadNodes.length) return;
+            
+            for (let node of deadNodes) {
+                // Find streams assigned to this dead node
+                dbLayer.db.all(`SELECT * FROM streams WHERE status = 'RUNNING' AND server_id = ?`, [node.id], async (err, streams: any[]) => {
+                    if (err || !streams.length) return;
+                    
+                    for (let s of streams) {
+                        const failoverMsg = `🚨 [Failover] Node <b>${node.name}</b> mati. Mencoba memindahkan stream <b>${s.title}</b> ke node sehat...`;
+                        this.sm.emitLog(s.id, 'warn', failoverMsg);
+                        dbLayer.saveSystemLog(s.id, 'warn', failoverMsg).catch(() => {});
+                        
+                        const bestNode = await this.pickBestNode();
+                        if (bestNode && bestNode.id !== node.id) {
+                            const meta = {
+                                server_id: bestNode.id,
+                                input_source: s.playlist_path,
+                                rtmp_url: s.rtmp_url,
+                                stream_key: s.stream_key,
+                                channel_name: s.title,
+                                is_concat: s.playlist_path?.includes(','),
+                                loop_mode: 'repeat_all'
+                            };
+                            
+                            // Start on new node
+                            this.sm.startStream(s.id, meta);
+                            telegramService.sendMessage(`🔄 <b>FAILOVER SUCCESS:</b> <i>${s.title}</i> dipindahkan ke <b>${bestNode.name}</b>.`).catch(() => {});
+                        }
+                    }
+                });
+            }
+        });
+    }
 
-        const timer = this.autoEndTimers.get(streamId);
-        if (timer) {
-            clearTimeout(timer);
-            this.autoEndTimers.delete(streamId);
-            console.log(`[AutomationEngine] Auto End timer for ${streamId} cleared.`);
+    async processFolderWithAI(folderPath: string, userId: string) {
+        if (!fs.existsSync(folderPath)) throw new Error('Folder tidak ditemukan.');
+        
+        const files = fs.readdirSync(folderPath).filter(f => ['.mp4', '.mkv', '.avi', '.mov'].includes(path.extname(f).toLowerCase()));
+        const { AIService } = require('./services/aiService');
+        
+        let count = 0;
+        for (const file of files) {
+            const fullPath = path.resolve(folderPath, file);
+            const title = file.replace(path.extname(file), '').replace(/_/g, ' ');
+            
+            // 1. Register Video if not exist
+            const videoId = 'vid-' + Date.now() + '-' + count;
+            await new Promise((res) => {
+                dbLayer.db.run(`INSERT OR IGNORE INTO videos (id, title, filepath, user_id) VALUES (?, ?, ?, ?)`, 
+                [videoId, title, fullPath, userId], () => res(null));
+            });
+
+            // 2. AI Gen Metadata
+            const aiData = await AIService.generateMetadata(title).catch(() => ({ title, description: 'AI Generated', tags: '#live' }));
+
+            // 3. Create Automated Schedule
+            const scheduleId = 'sched-' + Date.now() + '-' + count;
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(0, 0, 0, 0); // Start at midnight tomorrow
+            
+            await new Promise((res) => {
+                dbLayer.db.run(`INSERT INTO schedules (id, name, playlist_path, start_time, status, user_id, auto_title, auto_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [scheduleId, aiData.title, fullPath, tomorrow.toISOString(), 'SCHEDULED', userId, aiData.title, aiData.description], () => res(null));
+            });
+            count++;
         }
+        return count;
     }
 }
 
