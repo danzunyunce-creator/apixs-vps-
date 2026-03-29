@@ -153,10 +153,16 @@ router.post('/videos/bulk-delete', authMiddleware, async (req: AuthRequest, res)
                 dbLayer.db.get(`SELECT filepath, thumbnail_path FROM videos WHERE id = ?`, [id], (err, row: any) => {
                     if (row) {
                         try {
-                            if (fs.existsSync(row.filepath)) fs.unlinkSync(row.filepath);
+                            const safePath = path.resolve(row.filepath);
+                            if (safePath.startsWith(path.resolve(UPLOADS_DIR)) && fs.existsSync(safePath)) {
+                                fs.unlinkSync(safePath);
+                            }
                             if (row.thumbnail_path) {
                                 const fullThumb = path.join(UPLOADS_DIR, row.thumbnail_path);
-                                if (fs.existsSync(fullThumb)) fs.unlinkSync(fullThumb);
+                                const safeThumb = path.resolve(fullThumb);
+                                if (safeThumb.startsWith(path.resolve(UPLOADS_DIR)) && fs.existsSync(safeThumb)) {
+                                    fs.unlinkSync(safeThumb);
+                                }
                             }
                         } catch (e) {}
                     }
@@ -196,10 +202,16 @@ router.delete('/videos/:id', authMiddleware, (req: AuthRequest, res) => {
     dbLayer.db.get(`SELECT filepath, thumbnail_path FROM videos WHERE id = ?`, [req.params.id], (err, row: any) => {
         if (row) {
             try {
-                if (fs.existsSync(row.filepath)) fs.unlinkSync(row.filepath);
+                const safePath = path.resolve(row.filepath);
+                if (safePath.startsWith(path.resolve(UPLOADS_DIR)) && fs.existsSync(safePath)) {
+                    fs.unlinkSync(safePath);
+                }
                 if (row.thumbnail_path) {
                     const fullThumb = path.join(UPLOADS_DIR, row.thumbnail_path);
-                    if (fs.existsSync(fullThumb)) fs.unlinkSync(fullThumb);
+                    const safeThumb = path.resolve(fullThumb);
+                    if (safeThumb.startsWith(path.resolve(UPLOADS_DIR)) && fs.existsSync(safeThumb)) {
+                        fs.unlinkSync(safeThumb);
+                    }
                 }
             } catch (e) {}
         }

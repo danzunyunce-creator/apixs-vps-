@@ -155,7 +155,8 @@ export class StreamManager {
             '-reconnect_streamed', '1', 
             '-reconnect_delay_max', '5',
             '-timeout', '20000000', // 20 Seconds timeout for socket
-            '-err_detect', 'ignore_err'
+            '-err_detect', 'ignore_err',
+            '-thread_queue_size', '512' // Prevent buffer overflow for long streams
         );
         
         if (meta.loop_mode === 'repeat_all' || meta.loop_video) {

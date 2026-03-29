@@ -10,6 +10,7 @@ import * as dbLayer from './database';
 import StreamManager from './streamManager';
 import AutomationEngine from './automationEngine';
 import config from './config';
+import { exec } from 'child_process';
 
 // ── Routes ──
 import authRoutes from './routes/auth';
@@ -63,6 +64,15 @@ app.use((req, res, next) => {
 // ── Startup Cleanup ──
 const cleanupTempFiles = () => {
     try {
+        // Kill Orphaned FFmpeg Processes (Windows Only)
+        // Ensure no ghost processes are eating RAM from previous crashes
+        if (process.platform === 'win32') {
+            console.log('🧹 [Cleanup] Killing orphaned ffmpeg.exe processes...');
+            exec('taskkill /F /IM ffmpeg.exe /T', (err) => {
+                if (!err) console.log('✅ [Cleanup] Ghost FFmpeg processes purged.');
+            });
+        }
+
         if (!fs.existsSync(UPLOADS_DIR)) return;
         const files = fs.readdirSync(UPLOADS_DIR);
         let count = 0;
