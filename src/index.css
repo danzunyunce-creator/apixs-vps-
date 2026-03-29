@@ -125,8 +125,21 @@ a {
 }
 
 input,
-select {
+select,
+textarea {
   font-family: inherit;
+  color: #f8fafc;
+  background-color: #1e293b;
+}
+
+select option {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
 }
 
 /* Skeleton Shimmer Animation */
