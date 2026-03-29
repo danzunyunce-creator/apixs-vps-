@@ -120,7 +120,7 @@ export class StreamManager {
         }
 
         console.log(`[StreamManager] Force stopping stream ${id}`);
-        streamDesc.process?.kill('SIGTERM');
+        streamDesc.process?.kill('SIGKILL'); // Use SIGKILL for faster cleanup
 
         this.activeStreams.delete(id);
 

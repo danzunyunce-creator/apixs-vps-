@@ -25,7 +25,8 @@ const uploadVideo = multer({ storage: videoStorage, limits: { fileSize: 5000 * 1
 // --- UTILS ---
 const getMediaMetadata = (filePath: string): Promise<any> => {
     return new Promise((resolve) => {
-        exec(`ffprobe -v error -select_streams v:0 -show_entries format=duration,bit_rate:stream=width,height,avg_frame_rate -of json "${filePath}"`, (err, stdout) => {
+        const ffprobePath = config.FFMPEG_PATH.replace('ffmpeg', 'ffprobe');
+        exec(`"${ffprobePath}" -v error -select_streams v:0 -show_entries format=duration,bit_rate:stream=width,height,avg_frame_rate -of json "${filePath}"`, (err, stdout) => {
             if (err) return resolve({});
             try {
                 const data = JSON.parse(stdout);
@@ -44,7 +45,7 @@ const getMediaMetadata = (filePath: string): Promise<any> => {
 
 const extractVideoThumb = (videoPath: string, thumbPath: string): Promise<boolean> => {
     return new Promise((resolve) => {
-        exec(`ffmpeg -i "${videoPath}" -ss 00:00:02 -vframes 1 -s 320x180 "${thumbPath}" -y`, (err) => {
+        exec(`"${config.FFMPEG_PATH}" -i "${videoPath}" -ss 00:00:02 -vframes 1 -s 320x180 "${thumbPath}" -y`, (err) => {
             resolve(!err);
         });
     });
