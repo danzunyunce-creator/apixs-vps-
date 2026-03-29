@@ -303,10 +303,22 @@ export async function initializeDatabase(): Promise<void> {
   console.log('✅ [Database] System Health: EXCELLENT. All tables and migrations validated.');
 }
 
-export function rotateLogs(keepCount: number = 1000): void {
-    db.run(`DELETE FROM system_logs WHERE id NOT IN (SELECT id FROM system_logs ORDER BY created_at DESC LIMIT ?)`, [keepCount], (err) => {
-        if (!err) console.log(`✅ [Maintenance] Log database rotated. Keeping last ${keepCount} entries.`);
-    });
+export function rotateLogs(maxRows: number = 2000): void {
+  db.run(`DELETE FROM system_logs WHERE id NOT IN (SELECT id FROM system_logs ORDER BY created_at DESC LIMIT ?)`, [maxRows], (err) => {
+    if (err) console.error('[Database] Failed to rotate logs:', err);
+    else console.log(`[Database] Logs rotated to last ${maxRows} records.`);
+  });
+}
+
+/**
+ * Rotasi Sesi: Menghapus riwayat stream yang sudah lebih dari 30 hari.
+ * Menjaga ukuran database tetap ramping (Industrial Standard).
+ */
+export function rotateSessions(daysBack: number = 30): void {
+  db.run(`DELETE FROM stream_sessions WHERE start_time < datetime('now', '-${daysBack} days')`, [], (err) => {
+    if (err) console.error('[Database] Failed to rotate sessions:', err);
+    else console.log(`[Database] Old sessions (> ${daysBack} days) purged.`);
+  });
 }
 
 export function updateStreamStatus(id: string, status: string): Promise<number> {

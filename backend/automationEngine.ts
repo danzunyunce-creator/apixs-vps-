@@ -68,7 +68,6 @@ export class AutomationEngine {
     private async runHourlyTasks() {
         // Buang Sampah (Cleanup)
         this.trashCleanup();
-        dbLayer.rotateLogs(2000); // Bertambah: Simpan 2000 log terakhir setiap jam
         
         // Cek Kesehatan Resource VPS
         this.checkSystemHealth();
@@ -250,10 +249,11 @@ export class AutomationEngine {
     }
 
     private trashCleanup() {
-        console.log('[AutomationEngine] Running system trash cleanup...');
+        console.log('[AutomationEngine] Running industrial system trash cleanup...');
         try {
-            // 1. Rotate Database Logs (Keep last 2000 for production grade)
+            // 1. rotate Logs & Sessions
             dbLayer.rotateLogs(2000);
+            dbLayer.rotateSessions(30);
 
             // 2. Clean Folders
             if (fs.existsSync(config.UPLOADS_DIR)) {
@@ -441,6 +441,12 @@ export class AutomationEngine {
     }
 
     onStreamStop(streamId: string) {
+        // Clear Cooldown Entry (Memory Leak Fix)
+        if (this.rotateCooldown.has(streamId)) {
+            this.rotateCooldown.delete(streamId);
+            console.log(`[AutomationEngine] Memory cleanup: rotateCooldown for ${streamId} purged.`);
+        }
+
         const timer = this.autoEndTimers.get(streamId);
         if (timer) {
             clearTimeout(timer);

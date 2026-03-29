@@ -64,7 +64,9 @@ export default function YTAutomation() {
                 body: JSON.stringify({ enabled: !current })
             });
             fetchData();
-        } catch (e) {}
+        } catch (e: any) {
+            console.error('[YTAutomation] Failed to toggle rule:', e.message);
+        }
     };
 
     const runFullPipeline = async (files: FileList | null) => {
@@ -77,8 +79,12 @@ export default function YTAutomation() {
             progress: 0
         }));
         setJobs(prev => [...newJobs, ...prev]);
-        for (let i = 0; i < files.length; i++) {
-            processJob(newJobs[i].id, files[i]);
+        try {
+            for (let i = 0; i < files.length; i++) {
+                await processJob(newJobs[i].id, files[i]);
+            }
+        } finally {
+            setIsRunning(false);
         }
     };
 

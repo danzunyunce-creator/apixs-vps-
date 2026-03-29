@@ -41,7 +41,8 @@ export class StreamManager {
     private RESTART_TIMEOUT_MS = 5000;
     private LOG_THROTTLE_MS = 500;
     private autoEngine: any = null;
-    private availableEncoder: string = 'libx264'; // Default to CPU
+    private availableEncoder: string = 'libx264'; 
+    private lastCpuStats: { idle: number, total: number } | null = null;
 
     constructor(io: Server) {
         this.io = io;
@@ -379,9 +380,24 @@ export class StreamManager {
                 const totalMem = os.totalmem();
                 const freeMem = os.freemem();
                 
-                // Simplified CPU calculation (real CPU calculation usually needs a delta)
-                // For now using os.loadavg() as a proxy for cross-platform simplicity or a realistic mock
-                const cpuUsage = Math.floor(os.loadavg()[0] * 10); 
+                // Real CPU Calculation (Delta-based)
+                const cpus = os.cpus();
+                let idle = 0;
+                let total = 0;
+                cpus.forEach(cpu => {
+                    for (let type in cpu.times) {
+                        total += (cpu.times as any)[type];
+                    }
+                    idle += cpu.times.idle;
+                });
+
+                let cpuUsage = 0;
+                if (this.lastCpuStats) {
+                    const idleDiff = idle - this.lastCpuStats.idle;
+                    const totalDiff = total - this.lastCpuStats.total;
+                    cpuUsage = totalDiff > 0 ? Math.floor(100 - (100 * idleDiff / totalDiff)) : 0;
+                }
+                this.lastCpuStats = { idle, total };
                 
                 const ffmpegStatus = (config.FFMPEG_PATH === 'ffmpeg' || fs.existsSync(config.FFMPEG_PATH)) ? 'OK' : 'ERROR';
 
