@@ -157,22 +157,22 @@ export class AutomationEngine {
             telegramService.sendMessage(`⚠️ <b>CRITICAL RAM USAGE:</b> ${ramUsagePercent.toFixed(1)}%\nSistem mungkin akan melambat atau crash.`).catch(() => {});
         }
 
-        // 2. Check Disk Space (Linux/macOS style)
-        exec(`df -h "${config.UPLOADS_DIR}"`, (err, stdout) => {
-            if (err) return;
-            const lines = stdout.trim().split('\n');
-            if (lines.length < 2) return;
-            
-            const stats = lines[1].replace(/\s+/g, ' ').split(' ');
-            const usagePercent = parseInt(stats[4].replace('%', ''));
-            const available = stats[3];
+        // 2. Check Disk Space (Windows/Linux Cross-Platform)
+        try {
+            const stats = fs.statfsSync(config.UPLOADS_DIR);
+            const total = stats.blocks * stats.bsize;
+            const free = stats.bavail * stats.bsize;
+            const usagePercent = ((total - free) / total) * 100;
+            const availableGB = (free / (1024 * 1024 * 1024)).toFixed(1);
 
             if (usagePercent > 90) {
-                const sosMsg = `🚨 <b>SOS: DISK SPACE ALIVE!</b>\nPenyimpanan sisa ${available} (${usagePercent}% terpakai).\nSegera hapus video lama di Media Manager!`;
+                const sosMsg = `🚨 <b>SOS: DISK SPACE ALIVE!</b>\nPenyimpanan sisa ${availableGB} GB (${usagePercent.toFixed(1)}% terpakai).\nSegera hapus video lama di Media Manager!`;
                 telegramService.sendMessage(sosMsg).catch(() => {});
                 console.error('[Sentinel] ' + sosMsg);
             }
-        });
+        } catch (e) {
+            console.error('[Sentinel] Failed to check disk health:', e);
+        }
     }
 
     async checkScheduledAutoStarts() {
@@ -252,10 +252,10 @@ export class AutomationEngine {
     private trashCleanup() {
         console.log('[AutomationEngine] Running system trash cleanup...');
         try {
-            // 1. Rotate Database Logs
-            dbLayer.rotateLogs(500);
+            // 1. Rotate Database Logs (Keep last 2000 for production grade)
+            dbLayer.rotateLogs(2000);
 
-            // 2. Clean Manifest & Sched Files
+            // 2. Clean Folders
             if (fs.existsSync(config.UPLOADS_DIR)) {
                 const files = fs.readdirSync(config.UPLOADS_DIR);
                 const now = Date.now();
@@ -274,6 +274,18 @@ export class AutomationEngine {
                         fs.unlinkSync(fullPath);
                     }
                 });
+
+                // 3. Clean Old Thumbnails (> 7 days)
+                const thumbDir = path.join(config.UPLOADS_DIR, 'thumbnails');
+                if (fs.existsSync(thumbDir)) {
+                    const thumbs = fs.readdirSync(thumbDir);
+                    thumbs.forEach(t => {
+                        const tPath = path.join(thumbDir, t);
+                        const tStats = fs.statSync(tPath);
+                        const tAgeDays = (now - tStats.mtimeMs) / (3600000 * 24);
+                        if (tAgeDays > 7) fs.unlinkSync(tPath);
+                    });
+                }
             }
         } catch (e) {
             console.error('[AutomationEngine] Cleanup error:', e);

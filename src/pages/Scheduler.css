@@ -1,5 +1,5 @@
 .scheduler-page {
-    padding: 24px;
+    padding: 16px;
     max-width: 1400px;
     margin: 0 auto;
     color: var(--text-primary, #ffffff);
@@ -9,16 +9,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 32px;
+    margin-bottom: 16px;
 }
 
 .scheduler-header h1 {
-    font-size: 1.8rem;
+    font-size: 1.4rem;
     margin: 0;
     font-weight: 800;
-    letter-spacing: -1px;
+    letter-spacing: -0.5px;
     background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -30,31 +31,31 @@
 /* STATS */
 .stats-mini-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 32px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
 }
 
 .stat-card {
-    background: rgba(30, 41, 59, 0.7);
+    background: rgba(30, 41, 59, 0.5);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
 }
 
 .sc-label {
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     color: #94a3b8;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 8px;
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
 }
 
 .sc-val {
-    font-size: 1.8rem;
+    font-size: 1.4rem;
     font-weight: 700;
 }
 
@@ -64,11 +65,11 @@
 /* FORM CARD */
 .form-card {
     background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 20px;
-    padding: 20px;
-    margin-bottom: 40px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid #1e293b;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 15px 35px -12px rgba(0, 0, 0, 0.4);
 }
 
 .form-card h3 {
@@ -197,16 +198,16 @@
 /* GRID */
 .schedules-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
 }
 
 .schedule-card {
     background: #1e293b;
     border: 1px solid #334155;
-    border-radius: 20px;
+    border-radius: 12px;
     overflow: hidden;
-    transition: transform 0.3s, box-shadow 0.3s;
+    transition: all 0.2s;
     position: relative;
 }
 
@@ -216,25 +217,25 @@
 }
 
 .card-header {
-    padding: 16px 20px;
+    padding: 10px 16px;
     display: flex;
     align-items: center;
     background: rgba(0,0,0,0.2);
 }
 
 .status-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    margin-right: 12px;
+    margin-right: 10px;
 }
 
-.status-dot.running { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
+.status-dot.running { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
 .status-dot.scheduled { background: #3b82f6; }
 .status-dot.completed { background: #64748b; }
 
 .status-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -243,7 +244,7 @@
 .card-actions {
     margin-left: auto;
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 .card-actions button {
@@ -251,19 +252,19 @@
     border: none;
     color: #94a3b8;
     cursor: pointer;
-    padding: 4px;
+    padding: 2px;
     border-radius: 4px;
 }
 
 .card-actions button:hover { color: white; background: rgba(255,255,255,0.1); }
 
 .card-body {
-    padding: 16px;
+    padding: 12px;
 }
 
 .card-body h3 {
-    margin: 0 0 16px 0;
-    font-size: 1.25rem;
+    margin: 0 0 10px 0;
+    font-size: 1.1rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -272,24 +273,24 @@
 .time-info {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 6px;
+    margin-bottom: 12px;
 }
 
 .time-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     color: #94a3b8;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
 }
 
 .countdown-row {
-    margin-top: 4px;
+    margin-top: 2px;
 }
 
 .countdown-val {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 800;
     font-family: 'JetBrains Mono', monospace;
 }
@@ -300,16 +301,16 @@
 .source-info {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     background: rgba(0,0,0,0.15);
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 0.8rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
     color: #6366f1;
 }
 
 .card-footer {
-    padding: 16px 20px;
+    padding: 10px 16px;
     border-top: 1px solid #334155;
     display: flex;
     justify-content: space-between;
@@ -318,10 +319,10 @@
 
 .btn-start, .btn-stop {
     border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
+    border-radius: 6px;
+    padding: 6px 12px;
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     cursor: pointer;
     transition: opacity 0.2s;
 }

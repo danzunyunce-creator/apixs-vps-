@@ -43,10 +43,10 @@ export default function Analytics() {
 
     return (
         <div className="analytics-container">
-            <div className="analytics-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div className="analytics-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div>
                     <h2>📊 ANALYTICS</h2>
-                    <p>Data performa dan riwayat siaran langsung Anda.</p>
+                    <p className="subtitle">Data performa dan riwayat siaran langsung Anda.</p>
                 </div>
                 <button className="btn-save-all" onClick={exportCSV}>📥 EXPORT CSV</button>
             </div>
@@ -58,10 +58,10 @@ export default function Analytics() {
                 <StatCard title="Status Server" value="ONLINE" icon="✅" color="#10b981" />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-                <div className="card" style={{ padding: '20px' }}>
-                    <h3 style={{ marginTop: 0, fontSize: '16px' }}>🏆 TOP PERFORMING MEDIA</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="card" style={{ padding: '12px' }}>
+                    <h3 style={{ marginTop: 0, fontSize: '14px' }}>🏆 TOP PERFORMING MEDIA</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                         {data?.topVideos?.length > 0 ? data.topVideos.map((v: any, idx: number) => (
                             <div key={v.video_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
                                 <span><span style={{ color: 'var(--text-muted)' }}>#{idx+1}</span> {v.video_id}</span>
@@ -70,9 +70,9 @@ export default function Analytics() {
                         )) : <p style={{ color: 'var(--text-muted)' }}>Analysing metadata...</p>}
                     </div>
                 </div>
-                <div className="card" style={{ padding: '20px' }}>
-                    <h3 style={{ marginTop: 0, fontSize: '16px' }}>📊 PLATFORM DISTRIBUTION</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
+                <div className="card" style={{ padding: '12px' }}>
+                    <h3 style={{ marginTop: 0, fontSize: '14px' }}>📊 PLATFORM DISTRIBUTION</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                         {data?.platforms?.length > 0 ? data.platforms.map((p: any) => (
                             <div key={p.platform} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ width: '80px', fontSize: '12px', fontWeight: 'bold' }}>{p.platform}</div>
