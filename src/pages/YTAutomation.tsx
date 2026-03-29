@@ -254,7 +254,10 @@ export default function YTAutomation() {
                         {logs.length === 0 ? (
                             <div className="log-empty">Waiting for AI heartbeat...</div>
                         ) : (
-                                    )}
+                            logs.map(log => (
+                                <div key={log.id} className={`log-entry ${log.level}`}>
+                                    <span className="log-time">{new Date(log.created_at).toLocaleTimeString()}</span>
+                                    <span className="log-msg">{log.message}</span>
                                 </div>
                             ))
                         )}
