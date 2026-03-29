@@ -396,6 +396,38 @@ export class AutomationEngine {
         this.sm.emitLog(streamId, 'info', `[Auto End Stream] Aktif. Sistem akan menghentikan stream ini secara otomatis dalam ${durationHours} jam.`);
     }
 
+    async generateSmartThumbnail(videoId: string, titleShort: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            dbLayer.db.get(`SELECT filepath FROM videos WHERE id = ?`, [videoId], (err, row: any) => {
+                if (err || !row) return reject(new Error('Video not found'));
+                
+                const thumbDir = path.join(config.UPLOADS_DIR, 'thumbnails');
+                if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+
+                const thumbName = `smart_thumb_${videoId}_${Date.now()}.jpg`;
+                const thumbPath = path.join(thumbDir, thumbName);
+                const videoPath = row.filepath;
+                const safeTitle = (titleShort || 'LIVE STREAMING').replace(/'/g, "’").toUpperCase();
+
+                // FFmpeg Logic: Capture frame @ 00:01:00 + Overlay Text
+                // Style: Yellow text, Black border, Centered, and Red LIVE Badge
+                const drawTextFilter = `drawtext=text='${safeTitle}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=64:fontcolor=yellow:borderw=4:bordercolor=black`;
+                const liveBadgeFilter = `drawtext=text='🔴 LIVE':x=30:y=30:fontsize=32:fontcolor=white:box=1:boxcolor=red@0.8:boxborderw=10`;
+                
+                const cmd = `"${config.FFMPEG_PATH}" -ss 00:00:10 -i "${videoPath}" -vf "${drawTextFilter},${liveBadgeFilter}" -frames:v 1 -q:v 2 "${thumbPath}" -y`;
+                
+                exec(cmd, (execErr) => {
+                    if (execErr) {
+                        console.error('[ThumbnailGen] Error generating smart thumb:', execErr);
+                        return reject(execErr);
+                    }
+                    console.log(`[ThumbnailGen] Created: ${thumbName}`);
+                    resolve(thumbName);
+                });
+            });
+        });
+    }
+
     onStreamStop(streamId: string) {
         const timer = this.autoEndTimers.get(streamId);
         if (timer) {

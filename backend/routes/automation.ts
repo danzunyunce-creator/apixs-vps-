@@ -159,12 +159,20 @@ export const createAutomationRouter = (autoEngine: AutomationEngine) => {
     });
 
     // 6. THUMBNAIL GENERATOR (For Pipeline)
-    router.post('/thumbnail', authMiddleware, async (req, res) => {
-        const { videoId } = req.body;
-        dbLayer.db.get(`SELECT filepath FROM videos WHERE id = ?`, [videoId], async (err, row: any) => {
-            if (!row) return res.status(404).json({ error: 'Video not found' });
-            res.json({ thumbnail: `thumb_auto_${videoId}.jpg`, message: 'Thumbnail queued' });
-        });
+    router.post('/thumbnail', authMiddleware, async (req: AuthRequest, res) => {
+        const { videoId, title } = req.body;
+        try {
+            const thumbName = await autoEngine.generateSmartThumbnail(videoId, title || 'LIVE STREAMING');
+            const thumbUrl = `/uploads/thumbnails/${thumbName}`;
+            
+            // Save to database if needed, but for pipeline we return it
+            dbLayer.db.run(`UPDATE videos SET category = 'Automated' WHERE id = ?`, [videoId]);
+            
+            res.json({ thumbnail: thumbUrl, message: 'Thumbnail generated successfully' });
+        } catch (err: any) {
+            console.error('[AutomationRoute] Thumbnail error:', err);
+            res.status(500).json({ error: err.message });
+        }
     });
 
     return router;

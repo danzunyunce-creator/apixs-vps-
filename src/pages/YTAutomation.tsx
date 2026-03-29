@@ -61,11 +61,11 @@ export default function YTAutomation() {
             update({ stage: 'THUMB', progress: 50, results: { ...seoRes, videoId } });
 
             // STEP 3: THUMBNAIL
-            await apiFetch('/api/automation/thumbnail', {
+            const thumbRes = await apiFetch('/api/automation/thumbnail', {
                 method: 'POST',
-                body: JSON.stringify({ videoId })
+                body: JSON.stringify({ videoId, title: seoRes.title })
             });
-            update({ stage: 'DEPLOY', progress: 70 });
+            update({ stage: 'DEPLOY', progress: 70, results: { ...seoRes, videoId, thumbnail: thumbRes.thumbnail } });
 
             // STEP 4: CREATE STREAM
             const stream = await apiFetch('/api/streams', {
@@ -179,6 +179,13 @@ export default function YTAutomation() {
                                             </div>
                                         ))}
                                     </div>
+
+                                    {job.results?.thumbnail && (
+                                        <div className="job-thumb-preview">
+                                            <img src={job.results.thumbnail} alt="Preview" />
+                                            <div className="thumb-badge">AI GENERATED</div>
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}
