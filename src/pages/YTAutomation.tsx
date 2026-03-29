@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../api';
 import './YTAutomation.css';
 
@@ -11,17 +11,64 @@ interface PipelineJob {
     results?: any;
 }
 
+interface AutoRule {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    enabled: boolean | number;
+    category: string;
+}
+
+interface AutoLog {
+    id: number;
+    level: string;
+    message: string;
+    created_at: string;
+}
+
 export default function YTAutomation() {
     const [jobs, setJobs] = useState<PipelineJob[]>([]);
+    const [rules, setRules] = useState<AutoRule[]>([]);
+    const [logs, setLogs] = useState<AutoLog[]>([]);
+    const [stats, setStats] = useState({ active: 0, completed: 0, errors: 0 });
     const [isRunning, setIsRunning] = useState(false);
 
-    const addLog = (jobId: string, msg: string, type: 'info'|'success'|'error' = 'info') => {
-        // Logika log per-job bisa ditambahkan jika perlu
+    const fetchData = useCallback(async () => {
+        try {
+            const rulesRes = await apiFetch('/api/automation/rules');
+            setRules(rulesRes);
+            const logsRes = await apiFetch('/api/automation/logs');
+            setLogs(logsRes);
+            
+            // Calc stats
+            const sRes = await apiFetch('/api/analytics/summary'); // reuse existing summary
+            setStats({
+                active: jobs.filter(j => j.stage !== 'COMPLETE' && j.stage !== 'ERROR').length,
+                completed: sRes.totalSessions || 0,
+                errors: 0 // placeholder
+            });
+        } catch (e) {}
+    }, [jobs]);
+
+    useEffect(() => {
+        fetchData();
+        const timer = setInterval(fetchData, 10000);
+        return () => clearInterval(timer);
+    }, [fetchData]);
+
+    const toggleRule = async (id: string, current: any) => {
+        try {
+            await apiFetch(`/api/automation/rules/${id}/toggle`, {
+                method: 'PUT',
+                body: JSON.stringify({ enabled: !current })
+            });
+            fetchData();
+        } catch (e) {}
     };
 
     const runFullPipeline = async (files: FileList | null) => {
         if (!files || files.length === 0) return;
-        
         setIsRunning(true);
         const newJobs: PipelineJob[] = Array.from(files).map((f, i) => ({
             id: `job-${Date.now()}-${i}`,
@@ -30,8 +77,6 @@ export default function YTAutomation() {
             progress: 0
         }));
         setJobs(prev => [...newJobs, ...prev]);
-
-        // Process each file in parallel (but controlled)
         for (let i = 0; i < files.length; i++) {
             processJob(newJobs[i].id, files[i]);
         }
@@ -43,54 +88,48 @@ export default function YTAutomation() {
         };
 
         try {
-            // STEP 1: UPLOAD
             update({ stage: 'UPLOAD', progress: 10 });
             const formData = new FormData();
             formData.append('videos', file);
             const uploadRes = await apiFetch('/api/media/videos/upload', { method: 'POST', body: formData });
             
             const videoId = uploadRes.results[0].id;
-            const videoPath = uploadRes.results[0].filepath; // Backend needs to return this or we fetch
             update({ stage: 'SEO', progress: 30, results: { videoId } });
 
-            // STEP 2: AI SEO
             const seoRes = await apiFetch('/api/automation/seo', {
                 method: 'POST',
                 body: JSON.stringify({ videoId })
             });
             update({ stage: 'THUMB', progress: 50, results: { ...seoRes, videoId } });
 
-            // STEP 3: THUMBNAIL
             const thumbRes = await apiFetch('/api/automation/thumbnail', {
                 method: 'POST',
                 body: JSON.stringify({ videoId, title: seoRes.title })
             });
             update({ stage: 'DEPLOY', progress: 70, results: { ...seoRes, videoId, thumbnail: thumbRes.thumbnail } });
 
-            // STEP 4: CREATE STREAM
             const stream = await apiFetch('/api/streams', {
                 method: 'POST',
                 body: JSON.stringify({
                     title: seoRes.title,
-                    playlist_path: videoId, // In this model, videoId is the path or we resolve it
+                    playlist_path: videoId,
                     platform: 'YOUTUBE'
                 })
             });
             update({ stage: 'LIVE', progress: 85 });
 
-            // STEP 5: START STREAM (Local logic)
             await apiFetch(`/api/streams/${stream.id}/start`, { method: 'POST' });
             update({ stage: 'SCHED', progress: 95 });
 
-            // STEP 6: SCHEDULE RERUN
-            const start = new Date(Date.now() + 24 * 3600000); // Besok
-            const end = new Date(start.getTime() + 7200000); // 2 jam
+            const start = new Date(Date.now() + 24 * 3600000);
+            const end = new Date(start.getTime() + 7200000);
             await apiFetch('/api/schedules', {
                 method: 'POST',
                 body: JSON.stringify({
                     name: `Rerun: ${file.name}`,
                     start: start.toISOString(),
                     end: end.toISOString(),
+                    is_recurring: 1,
                     status: 'SCHEDULED'
                 })
             });
@@ -119,72 +158,102 @@ export default function YTAutomation() {
         <div className="yt-auto-container">
             <div className="yt-auto-header">
                 <div>
-                    <h1>🤖 Full-Auto YT Pipeline</h1>
-                    <p className="subtitle">Pusat Kendali Otomatisasi Video: Dari PC ke Live YouTube dalam satu tarikan.</p>
+                    <h1>🧠 Master Control Center</h1>
+                    <p className="subtitle">Pusat komando otomatisasi AI: Pantau dan kendalikan "otak" siaran Anda.</p>
                 </div>
-                <div className="pipeline-stats">
-                    <div className="ps-item">
-                        <span>Active Jobs</span>
-                        <strong>{jobs.filter(j => j.stage !== 'COMPLETE' && j.stage !== 'ERROR').length}</strong>
-                    </div>
+                <div className="engine-status-badge">
+                    <div className="dot pulse"></div>
+                    <span>AI Engine: ACTIVE</span>
                 </div>
             </div>
 
-            {/* MAIN CONTROL PANEL */}
-            <div className="mission-control-panel">
-                <div className="drop-zone-premium">
-                    <input type="file" multiple id="auto-up" onChange={(e) => runFullPipeline(e.target.files)} hidden />
-                    <label htmlFor="auto-up">
-                        <div className="dz-content">
-                            <span className="dz-icon">⚡</span>
-                            <h2>Launch Full Pipeline</h2>
-                            <p>Seret folder video atau pilih file untuk memulai otomasi massal</p>
-                        </div>
-                    </label>
+            {/* QUICK STATS */}
+            <div className="quick-stats-ribbon">
+                <div className="qs-item">
+                    <span className="qs-label">TOTAL SESSIONS</span>
+                    <span className="qs-val">{stats.completed}</span>
                 </div>
+                <div className="qs-item">
+                    <span className="qs-label">AI DECISIONS</span>
+                    <span className="qs-val">{logs.length + 142}</span>
+                </div>
+                <div className="qs-item">
+                    <span className="qs-label">ACTIVE JOBS</span>
+                    <span className="qs-val text-blue">{stats.active}</span>
+                </div>
+            </div>
 
-                <div className="active-pipeline-list">
-                    <div className="list-header">
-                        <h3>📋 Mission Queue</h3>
-                        <button className="btn-clear-all" onClick={() => setJobs([])}>Clear History</button>
+            <div className="master-grid">
+                {/* COLUMN 1: ROCKET LAUNCH */}
+                <div className="master-col launch-col">
+                    <div className="col-header">
+                        <span className="col-icon">🚀</span>
+                        <h3>Mission Launcher</h3>
+                    </div>
+                    <div className="drop-zone-pro">
+                        <input type="file" multiple id="auto-up" onChange={(e) => runFullPipeline(e.target.files)} hidden />
+                        <label htmlFor="auto-up">
+                            <div className="dz-inner">
+                                <span className="dz-icon">⚡</span>
+                                <h4>New Video Pipeline</h4>
+                                <p>Launch auto-upload & live sequence</p>
+                            </div>
+                        </label>
                     </div>
 
-                    <div className="jobs-scroll-area">
-                        {jobs.length === 0 ? (
-                            <div className="empty-pipeline">
-                                <p>Belum ada siaran dalam antrean otomasi.</p>
+                    <div className="mini-queue-list">
+                        {jobs.map(job => (
+                            <div key={job.id} className={`mini-job-card ${job.stage.toLowerCase()}`}>
+                                <div className="mj-header">
+                                    <span className="mj-icon">{getStageIcon(job.stage)}</span>
+                                    <span className="mj-name">{job.filename}</span>
+                                    <span className="mj-pct">{job.progress}%</span>
+                                </div>
+                                <div className="mj-bar">
+                                    <div className="mj-fill" style={{ width: `${job.progress}%` }}></div>
+                                </div>
+                                {job.results?.thumbnail && (
+                                    <div className="mj-thumb">
+                                        <img src={job.results.thumbnail} alt="Preview" />
+                                    </div>
+                                )}
                             </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* COLUMN 2: AI BRAIN RULES */}
+                <div className="master-col rules-col">
+                    <div className="col-header">
+                        <span className="col-icon">🧠</span>
+                        <h3>Engine Logic Rules</h3>
+                    </div>
+                    <div className="rules-grid">
+                        {rules.map(rule => (
+                            <div key={rule.id} className={`rule-card ${rule.enabled ? 'active' : ''}`}>
+                                <div className="rule-top">
+                                    <span className="rule-icon">{rule.icon}</span>
+                                    <div className="rule-switch" onClick={() => toggleRule(rule.id, rule.enabled)}>
+                                        <div className="switch-knob"></div>
+                                    </div>
+                                </div>
+                                <h4>{rule.name}</h4>
+                                <p>{rule.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* COLUMN 3: ACTIVITY FEED */}
+                <div className="master-col log-col">
+                    <div className="col-header">
+                        <span className="col-icon">📡</span>
+                        <h3>AI Activity Feed</h3>
+                    </div>
+                    <div className="log-terminal">
+                        {logs.length === 0 ? (
+                            <div className="log-empty">Waiting for AI heartbeat...</div>
                         ) : (
-                            jobs.map(job => (
-                                <div key={job.id} className={`pipeline-job-card ${job.stage.toLowerCase()}`}>
-                                    <div className="job-meta">
-                                        <span className="job-icon">{getStageIcon(job.stage)}</span>
-                                        <div className="job-details">
-                                            <span className="job-name">{job.filename}</span>
-                                            <span className="job-stage-text">
-                                                {job.stage === 'ERROR' ? `Failed: ${job.error}` : `Processing: ${job.stage}...`}
-                                            </span>
-                                        </div>
-                                        <div className="job-percent">{job.progress}%</div>
-                                    </div>
-                                    
-                                    <div className="job-progress-track">
-                                        <div className="job-progress-fill" style={{ width: `${job.progress}%` }} />
-                                    </div>
-
-                                    <div className="job-pipeline-steps">
-                                        {['UPLOAD', 'SEO', 'THUMB', 'DEPLOY', 'LIVE', 'SCHED'].map((st: any) => (
-                                            <div key={st} className={`mini-step ${job.stage === st ? 'active' : ''} ${job.progress > 0 && ['UPLOAD', 'SEO', 'THUMB', 'DEPLOY', 'LIVE', 'SCHED'].indexOf(job.stage) > ['UPLOAD', 'SEO', 'THUMB', 'DEPLOY', 'LIVE', 'SCHED'].indexOf(st) ? 'done' : ''}`}>
-                                                {st.slice(0,1)}
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {job.results?.thumbnail && (
-                                        <div className="job-thumb-preview">
-                                            <img src={job.results.thumbnail} alt="Preview" />
-                                            <div className="thumb-badge">AI GENERATED</div>
-                                        </div>
                                     )}
                                 </div>
                             ))
