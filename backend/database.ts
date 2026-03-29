@@ -281,6 +281,7 @@ export async function initializeDatabase(): Promise<void> {
     safeAddColumn('streams', 'restart_count', 'INTEGER DEFAULT 0');
     safeAddColumn('schedules', 'stream_id', 'TEXT');
     safeAddColumn('schedules', 'youtube_account_id', 'TEXT');
+    safeAddColumn('schedules', 'is_recurring', 'INTEGER DEFAULT 0');
     safeAddColumn('users', 'user_role', "TEXT DEFAULT 'admin'");
   });
 
