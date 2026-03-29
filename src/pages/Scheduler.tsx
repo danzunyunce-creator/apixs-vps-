@@ -222,17 +222,22 @@ export default function Scheduler() {
                             <input type="datetime-local" value={formData.end} onChange={e => setFormData({...formData, end: e.target.value})} />
                         </div>
                         <div className="form-item">
-                            <label>Target Channel (Auto API)</label>
+                            <label>Target Channel</label>
                             <select value={formData.youtube_account_id} onChange={e => {
                                 setFormData({...formData, youtube_account_id: e.target.value, stream_key: ''})
-                            }} required>
-                                <option value="" disabled>🎯 Pilih Channel Tujuan...</option>
+                            }}>
+                                <option value="">🎯 Manual Stream Key</option>
                                 {channels.map(ch => (
                                     <option key={ch.id} value={ch.id}>🔴 {ch.channel_name}</option>
                                 ))}
                             </select>
-                            {channels.length === 0 && <small style={{color:'#ef4444', display:'block', marginTop:'8px'}}>Belum ada channel terhubung. Harap atur di menu Pengaturan.</small>}
                         </div>
+                        {!formData.youtube_account_id && (
+                            <div className="form-item">
+                                <label>Stream Key (Manual)</label>
+                                <input value={formData.stream_key} onChange={e => setFormData({...formData, stream_key: e.target.value})} placeholder="Masukkan Stream Key Manual di sini..." />
+                            </div>
+                        )}
                         <div className="form-item">
                             <label>🎬 Sumber Master Video</label>
                             <select value={formData.playlist_path} onChange={e => setFormData({...formData, playlist_path: e.target.value})} required>
