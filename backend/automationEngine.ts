@@ -5,6 +5,8 @@ import { telegramService } from './telegramService';
 import config from './config';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { exec } from 'child_process';
 
 export class AutomationEngine {
     private sm: StreamManager;
@@ -67,6 +69,9 @@ export class AutomationEngine {
         // Buang Sampah (Cleanup)
         this.trashCleanup();
         dbLayer.rotateLogs(2000); // Bertambah: Simpan 2000 log terakhir setiap jam
+        
+        // Cek Kesehatan Resource VPS
+        this.checkSystemHealth();
         
         if (await this.isRuleEnabled('Health Pulse Monitoring')) {
             this.sendHealthPulse();
@@ -139,6 +144,34 @@ export class AutomationEngine {
             setTimeout(() => {
                 this.sm.startStream(`sched-${scheduleId}`, meta);
             }, 3000);
+        });
+    }
+
+    private checkSystemHealth() {
+        // 1. Check RAM
+        const freeMem = os.freemem();
+        const totalMem = os.totalmem();
+        const ramUsagePercent = ((totalMem - freeMem) / totalMem) * 100;
+
+        if (ramUsagePercent > 90) {
+            telegramService.sendMessage(`⚠️ <b>CRITICAL RAM USAGE:</b> ${ramUsagePercent.toFixed(1)}%\nSistem mungkin akan melambat atau crash.`).catch(() => {});
+        }
+
+        // 2. Check Disk Space (Linux/macOS style)
+        exec(`df -h "${config.UPLOADS_DIR}"`, (err, stdout) => {
+            if (err) return;
+            const lines = stdout.trim().split('\n');
+            if (lines.length < 2) return;
+            
+            const stats = lines[1].replace(/\s+/g, ' ').split(' ');
+            const usagePercent = parseInt(stats[4].replace('%', ''));
+            const available = stats[3];
+
+            if (usagePercent > 90) {
+                const sosMsg = `🚨 <b>SOS: DISK SPACE ALIVE!</b>\nPenyimpanan sisa ${available} (${usagePercent}% terpakai).\nSegera hapus video lama di Media Manager!`;
+                telegramService.sendMessage(sosMsg).catch(() => {});
+                console.error('[Sentinel] ' + sosMsg);
+            }
         });
     }
 

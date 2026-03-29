@@ -41,11 +41,29 @@ export class StreamManager {
     private RESTART_TIMEOUT_MS = 5000;
     private LOG_THROTTLE_MS = 500;
     private autoEngine: any = null;
+    private availableEncoder: string = 'libx264'; // Default to CPU
 
     constructor(io: Server) {
         this.io = io;
         this.activeStreams = new Map();
         this.startMetricsBroadcast();
+        this.probeEncoders();
+    }
+
+    private probeEncoders() {
+        exec(`"${config.FFMPEG_PATH}" -encoders`, (err, stdout) => {
+            if (err) return;
+            if (stdout.includes('h264_nvenc')) {
+                this.availableEncoder = 'h264_nvenc';
+                console.log('🚀 [StreamManager] NVIDIA NVENC Hardware detected! Using for streams.');
+            } else if (stdout.includes('h264_vaapi')) {
+                this.availableEncoder = 'h264_vaapi';
+                console.log('🚀 [StreamManager] VAAPI Hardware (Intel/AMD) detected! Using for streams.');
+            } else {
+                this.availableEncoder = 'libx264';
+                console.log('💻 [StreamManager] No GPU detected. Using libx264 (CPU) with ultrafast preset.');
+            }
+        });
     }
 
     attachAutomationEngine(engine: any) {
@@ -120,6 +138,9 @@ export class StreamManager {
         
         const args: string[] = [];
         
+        // --- INDESTRUCTIBLE RECONNECT (Level Network) ---
+        args.push('-reconnect', '1', '-reconnect_at_eof', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
+        
         if (meta.loop_mode === 'repeat_all' || meta.loop_video) {
             args.push('-stream_loop', '-1');
         }
@@ -136,16 +157,38 @@ export class StreamManager {
             }
         }
         
-        if (meta.is_concat) {
-            // Jika playlist (multidile), gunakan transcode ringan agar resolusi berbeda tidak crash
-            args.push(
-                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26',
-                '-maxrate', '3000k', '-bufsize', '6000k', '-pix_fmt', 'yuv420p', '-g', '60'
-            );
+        // --- HW ACCELERATED ENCODING & QUALITY FILTER ---
+        if (meta.is_concat || this.availableEncoder !== 'libx264') {
+            const videoFilters: string[] = [];
+
+            // Jika playlist atau ada GPU, gunakan transcode
+            args.push('-c:v', this.availableEncoder);
+            
+            if (this.availableEncoder === 'h264_nvenc') {
+                args.push('-preset', 'p1', '-rc:v', 'vbr', '-cq:v', '26', '-maxrate', '3000k', '-bufsize', '6000k');
+            } else if (this.availableEncoder === 'h264_vaapi') {
+                args.push('-vaapi_device', '/dev/dri/renderD128');
+                videoFilters.push('format=nv12', 'hwupload');
+                args.push('-qp', '26');
+            } else {
+                // Default CPU
+                args.push('-preset', 'ultrafast', '-crf', '26', '-maxrate', '3000k', '-bufsize', '6000k');
+            }
+            
+            // --- PREMIUM SHARPENING (Jernih!) ---
+            videoFilters.push('unsharp=3:3:1.5:3:3:0.5');
+            
+            if (videoFilters.length > 0) {
+                args.push('-vf', videoFilters.join(','));
+            }
+
+            args.push('-pix_fmt', 'yuv420p', '-g', '60');
+            
         } else {
+            // Direct Copy if single file and no GPU needed (to save CPU)
             args.push('-c:v', 'copy');
         }
-
+        
         args.push(
             '-af', 'dynaudnorm',
             '-c:a', 'aac',
