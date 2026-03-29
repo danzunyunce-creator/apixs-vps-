@@ -93,18 +93,29 @@
     margin-bottom: 8px;
 }
 
-.form-item input {
+.form-item input,
+.form-item select {
     width: 100%;
     background: #1e293b;
     border: 1px solid #334155;
     border-radius: 10px;
     padding: 12px 16px;
-    color: white;
+    color: #f8fafc;
     font-size: 1rem;
     transition: all 0.3s;
 }
 
-.form-item input:focus {
+.form-item select option {
+    background: #1e293b;
+    color: #f8fafc;
+}
+
+.form-item input::placeholder {
+    color: #64748b;
+}
+
+.form-item input:focus,
+.form-item select:focus {
     outline: none;
     border-color: #6366f1;
     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
