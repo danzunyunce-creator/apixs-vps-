@@ -61,6 +61,7 @@ export class AutomationEngine {
                 });
             } catch (e) {
                 console.warn(`[AutomationEngine] Failed to sync viewers for ${id}:`, (e as any).message);
+                desc.viewers = -2; // Mark as API ERROR
             }
         }
     }

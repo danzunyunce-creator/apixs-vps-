@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../api';
 import './YTAutomation.css';
 
@@ -33,6 +33,15 @@ export default function YTAutomation() {
     const [logs, setLogs] = useState<AutoLog[]>([]);
     const [stats, setStats] = useState({ active: 0, completed: 0, errors: 0 });
     const [isRunning, setIsRunning] = useState(false);
+    const logEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [logs]);
 
     const fetchData = useCallback(async () => {
         try {
@@ -267,6 +276,7 @@ export default function YTAutomation() {
                                 </div>
                             ))
                         )}
+                        <div ref={logEndRef} />
                     </div>
                 </div>
             </div>

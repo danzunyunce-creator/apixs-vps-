@@ -115,21 +115,30 @@ export class StreamManager {
         }
 
         streamDesc.autoRestart = false;
-
         if (streamDesc.restartTimer) {
             clearTimeout(streamDesc.restartTimer);
         }
 
-        console.log(`[StreamManager] Force stopping stream ${id}`);
-        streamDesc.process?.kill('SIGKILL'); // Use SIGKILL for faster cleanup
+        console.log(`[StreamManager] Attempting graceful stop for ${id} (SIGTERM)...`);
+        streamDesc.process?.kill('SIGTERM'); // Politely ask to stop
 
+        // Wait 3 seconds then force kill if still alive
+        const forceKillTimer = setTimeout(() => {
+            if (this.activeStreams.has(id)) {
+                console.log(`[StreamManager] Graceful stop timed out for ${id}. Force killing (SIGKILL)...`);
+                streamDesc.process?.kill('SIGKILL');
+                this.activeStreams.delete(id);
+            }
+        }, 3000);
+
+        // We delete from map early so UI updates immediately
         this.activeStreams.delete(id);
 
         if (this.autoEngine) {
             this.autoEngine.onStreamStop(id);
         }
 
-        this.emitLog(id, 'success', `Stream ${id} intentionally stopped by user.`);
+        this.emitLog(id, 'success', `Stream ${id} termination sequence initiated.`);
         dbLayer.updateStreamStatus(id, 'STOP').catch(console.error);
     }
 
@@ -139,8 +148,15 @@ export class StreamManager {
         
         const args: string[] = [];
         
-        // --- INDESTRUCTIBLE RECONNECT (Level Network) ---
-        args.push('-reconnect', '1', '-reconnect_at_eof', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
+        // --- INDESTRUCTIBLE RECONNECT (Level Network Resilience) ---
+        args.push(
+            '-reconnect', '1', 
+            '-reconnect_at_eof', '1', 
+            '-reconnect_streamed', '1', 
+            '-reconnect_delay_max', '5',
+            '-timeout', '20000000', // 20 Seconds timeout for socket
+            '-err_detect', 'ignore_err'
+        );
         
         if (meta.loop_mode === 'repeat_all' || meta.loop_video) {
             args.push('-stream_loop', '-1');

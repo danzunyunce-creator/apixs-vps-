@@ -1,5 +1,6 @@
 import { google, youtube_v3 } from 'googleapis';
 import * as dbLayer from './database';
+import { telegramService } from './telegramService';
 
 class YoutubeApiManager {
     private quotaLockUntil: number | null = null;
@@ -77,7 +78,12 @@ class YoutubeApiManager {
             
         } catch (err: any) {
             if (err.response?.data?.error?.errors?.[0]?.reason === 'quotaExceeded') {
-                console.warn(`[API] OAuth Quota Limit reached.`);
+                const msg = '⚠️ [API] YouTube Quota Exceeded. Fitur SEO & Analytics akan tertidur sampai reset jam 16:00 WIB.';
+                console.warn(msg);
+                
+                dbLayer.saveSystemLog(null, 'warn', msg).catch(() => {});
+                telegramService.sendMessage(`🚨 <b>API ALERT:</b> ${msg}`).catch(() => {});
+
                 this.quotaLockUntil = Date.now() + this.getResetDelayMs();
                 throw new Error('Semua API Key kehabisan Kuota. Smart Delay diaktifkan.');
             }
