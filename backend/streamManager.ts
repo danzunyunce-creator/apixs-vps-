@@ -385,6 +385,13 @@ export class StreamManager {
                 
                 const ffmpegStatus = (config.FFMPEG_PATH === 'ffmpeg' || fs.existsSync(config.FFMPEG_PATH)) ? 'OK' : 'ERROR';
 
+                let diskSpace = 'Unknown';
+                try {
+                    const stats = fs.statfsSync(config.UPLOADS_DIR);
+                    const freeGB = (stats.bavail * stats.bsize) / (1024 * 1024 * 1024);
+                    diskSpace = `${freeGB.toFixed(1)} GB Free`;
+                } catch (e) {}
+
                 const dbStatus = await new Promise<string>((resolve) => {
                     dbLayer.db.get('SELECT 1', (err) => resolve(err ? 'ERROR' : 'OK'));
                 });
@@ -403,7 +410,9 @@ export class StreamManager {
                         memory: Math.round(((totalMem - freeMem) / totalMem) * 100),
                         health: {
                             ffmpeg: ffmpegStatus,
-                            database: dbStatus
+                            database: dbStatus,
+                            encoder: this.availableEncoder.replace('h264_', '').toUpperCase(),
+                            disk: diskSpace
                         }
                     },
                     streams: streamStats,

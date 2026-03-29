@@ -15,12 +15,14 @@ const ActivityIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill=
 const CpuIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" /></svg>;
 const EyeIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
 const ServerIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6" y2="6"/><line x1="6" y1="18" x2="6" y2="18"/></svg>;
+const DiskIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="3" width="20" height="18" rx="2" ry="2" /><line x1="2" y1="12" x2="22" y2="12" /></svg>;
+const EngineIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
 
 interface DashboardPayload {
   metrics: {
     cpu: number;
     memory: number;
-    health: { ffmpeg: string; database: string };
+    health: { ffmpeg: string; database: string; encoder: string; disk: string };
   };
   streams: any[];
   timestamp: string;
@@ -137,11 +139,13 @@ export default function Dashboard() {
             </div>
 
             {/* METRICS GRID */}
-            <div className="metrics-grid stats-compact">
+            <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                 <MetricCard icon={<ActivityIcon />} label="ACTIVE" sub="RUNNING INSTANCES" value={metrics.activeStreams} color="blue" />
                 <MetricCard icon={<EyeIcon />} label="VIEWS" sub="ACCUMULATED REACH" value={metrics.totalViews.toLocaleString()} color="green" />
                 <MetricCard icon={<CpuIcon />} label="CPU" sub="PROCESSOR LOAD" value={`${metrics.cpu}%`} color="purple" />
                 <MetricCard icon={<ServerIcon />} label="RAM" sub="MEMORY UTILIZATION" value={`${metrics.memory}%`} color="orange" />
+                <MetricCard icon={<DiskIcon />} label="STORAGE" sub="FREE SPACE AVAILABLE" value={metrics?.health?.disk || 'PROBING...'} color="cyan" />
+                <MetricCard icon={<EngineIcon />} label="ENGINE" sub="ACTIVE HW ENCODER" value={metrics?.health?.encoder || 'CPU'} color="indigo" />
             </div>
 
             {/* CHARTS SECTION */}
