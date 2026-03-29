@@ -154,11 +154,17 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
 
             if (!row) return res.status(404).json({ error: 'Stream not found' });
             
+            // Fetch all enabled destinations for this stream
+            const destinations: any[] = await new Promise((res) => {
+                dbLayer.db.all(`SELECT name, rtmp_url, stream_key FROM stream_destinations WHERE stream_id = ? AND is_enabled = 1`, [id], (e, r) => res(r || []));
+            });
+
             const meta = {
                 server_id: 'local-node',
                 input_source: row.playlist_path,
                 stream_key: row.stream_key,
                 rtmp_url: row.rtmp_url,
+                destinations: destinations.length > 0 ? destinations : [{ name: 'Default', rtmp_url: row.rtmp_url, stream_key: row.stream_key }],
                 channel_name: row.title,
                 youtube_account_id: row.youtube_account_id,
                 is_concat: row.playlist_path.includes(','),
@@ -167,10 +173,41 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
 
             await streamManager.startStream(id as string, meta);
             dbLayer.db.run(`UPDATE streams SET status = 'RUNNING' WHERE id = ?`, [id]);
-            res.json({ message: 'Stream starting...', id });
+            res.json({ message: 'Stream starting...', id, platforms: meta.destinations.length });
         } catch (err: any) {
             res.status(500).json({ error: err.message });
         }
+    });
+
+    // 7.1 MANAGE DESTINATIONS
+    router.get('/:id/destinations', authMiddleware, (req, res) => {
+        const { id } = req.params;
+        dbLayer.db.all(`SELECT * FROM stream_destinations WHERE stream_id = ?`, [id], (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows);
+        });
+    });
+
+    router.post('/:id/destinations', authMiddleware, (req, res) => {
+        const { id } = req.params;
+        const { name, platform, rtmp_url, stream_key } = req.body;
+        const destId = 'dest-' + Date.now();
+        dbLayer.db.run(
+            `INSERT INTO stream_destinations (id, stream_id, name, platform, rtmp_url, stream_key) VALUES (?, ?, ?, ?, ?, ?)`,
+            [destId, id, name, platform || 'OTHER', rtmp_url, stream_key],
+            function(err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ id: destId, name, message: 'Destination added' });
+            }
+        );
+    });
+
+    router.delete('/destinations/:destId', authMiddleware, (req, res) => {
+        const { destId } = req.params;
+        dbLayer.db.run(`DELETE FROM stream_destinations WHERE id = ?`, [destId], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: 'Destination deleted' });
+        });
     });
 
     // 8. STOP STREAM

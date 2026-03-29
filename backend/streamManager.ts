@@ -16,6 +16,7 @@ export interface StreamMeta {
     loop_video?: boolean;
     is_concat?: boolean;
     server_id?: string;
+    destinations?: Array<{ rtmp_url: string; stream_key: string; name: string }>;
     channel_name?: string;
     niche?: string;
     youtube_account_id?: string;
@@ -208,14 +209,32 @@ export class StreamManager {
             args.push('-c:v', 'copy');
         }
         
-        args.push(
-            '-af', 'dynaudnorm',
-            '-c:a', 'aac',
-            '-b:a', '128k',
-            '-ar', '44100',
-            '-f', 'flv',
-            rtmpDest
-        );
+        if (meta.destinations && meta.destinations.length > 1) {
+            // --- HYPER-SCALE SIMULCAST (Tee Muxer) ---
+            const teeArgs = meta.destinations.map(d => {
+                const fullUrl = d.rtmp_url.endsWith('/') ? `${d.rtmp_url}${d.stream_key}` : `${d.rtmp_url}/${d.stream_key}`;
+                return `[f=flv]${fullUrl.replace(/[\[\]\|]/g, '\\$&')}`; // Escape tee chars
+            }).join('|');
+
+            args.push(
+                '-af', 'dynaudnorm',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-ar', '44100',
+                '-f', 'tee',
+                teeArgs
+            );
+        } else {
+            // Single Destination (Standard)
+            args.push(
+                '-af', 'dynaudnorm',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-ar', '44100',
+                '-f', 'flv',
+                rtmpDest
+            );
+        }
         
         return args;
     }

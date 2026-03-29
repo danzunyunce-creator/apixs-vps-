@@ -151,6 +151,19 @@ function createTables(): Promise<void> {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )`);
 
+      db.run(`CREATE TABLE IF NOT EXISTS stream_destinations (
+        id TEXT PRIMARY KEY,
+        stream_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        platform TEXT,
+        rtmp_url TEXT NOT NULL,
+        stream_key TEXT NOT NULL,
+        is_enabled BOOLEAN DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (stream_id) REFERENCES streams(id)
+      )`);
+
       db.run(`CREATE TABLE IF NOT EXISTS schedules (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -210,11 +223,18 @@ function createTables(): Promise<void> {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`, (err) => {
         if (!err) {
-          const keys = ['telegram_bot_token','telegram_chat_id','yt_api_key_1','yt_api_key_2','yt_client_id','yt_client_secret','register_enabled', 'app_redirect_url'];
-          keys.forEach(k => db.run(`INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)`, [k, 
-            k === 'register_enabled' ? 'false' : 
-            k === 'app_redirect_url' ? 'http://localhost:3001/api/youtube/oauth-callback' : ''
-          ]));
+          const keys = ['telegram_bot_token','telegram_chat_id','yt_api_key_1','yt_api_key_2','yt_client_id','yt_client_secret','register_enabled', 'app_redirect_url', 'openai_api_key', 'ai_prompt_template'];
+          const defaultSettings = [
+            { key: 'register_enabled', value: 'false' },
+            { key: 'app_redirect_url', value: 'http://localhost:3001/api/youtube/oauth-callback' },
+            { key: 'openai_api_key', value: '' },
+            { key: 'ai_prompt_template', value: 'Buat judul viral, deskripsi SEO, dan 10 hashtag untuk video ini: {title}' }
+          ];
+          
+          keys.forEach(k => {
+            const setting = defaultSettings.find(s => s.key === k);
+            db.run(`INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)`, [k, setting ? setting.value : '']);
+          });
         }
       });
 
@@ -287,6 +307,10 @@ export async function initializeDatabase(): Promise<void> {
     safeAddColumn('schedules', 'is_recurring', 'INTEGER DEFAULT 0');
     safeAddColumn('users', 'user_role', "TEXT DEFAULT 'admin'");
     safeAddColumn('system_logs', 'source_ip', 'TEXT');
+    
+    // AI Migration
+    db.run(`INSERT OR IGNORE INTO app_config (key, value) VALUES ('openai_api_key', '')`);
+    db.run(`INSERT OR IGNORE INTO app_config (key, value) VALUES ('ai_prompt_template', 'Buat judul viral, deskripsi SEO, dan 10 hashtag untuk video ini: {title}')`);
   });
 
   // Seed Admin Accounts

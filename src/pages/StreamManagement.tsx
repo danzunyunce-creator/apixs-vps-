@@ -33,14 +33,15 @@ export default function StreamManagement() {
     const [schedules, setSchedules] = useState<Schedule[]>([]);
     const [logs, setLogs] = useState<{time: string, msg: string, type: 'info'|'warn'|'error'|'success'}[]>([]);
     const [loading, setLoading] = useState(false);
-    const [showAddModal, setShowAddModal] = useState(false);
     const [allVideos, setAllVideos] = useState<any[]>([]);
+    const [aiLoading, setAiLoading] = useState(false);
     const [newStream, setNewStream] = useState({
         title: '',
         platform: 'YOUTUBE',
         rtmp_url: 'rtmp://a.rtmp.youtube.com/live2',
         stream_key: '',
-        playlist_path: ''
+        playlist_path: '',
+        destinations: [] as any[]
     });
 
     // ── DATA FETCHING ──
@@ -110,12 +111,27 @@ export default function StreamManagement() {
         
         try {
             setLoading(true);
-            await apiFetch('/api/streams', {
+            const res = await apiFetch('/api/streams', {
                 method: 'POST',
-                body: JSON.stringify(newStream)
+                body: JSON.stringify({
+                    ...newStream,
+                    rtmp_url: newStream.rtmp_url,
+                    stream_key: newStream.stream_key
+                })
             });
+
+            // If we have multi-destinations, save them
+            if (newStream.destinations.length > 0) {
+                for (const dest of newStream.destinations) {
+                    await apiFetch(`/api/streams/${res.id}/destinations`, {
+                        method: 'POST',
+                        body: JSON.stringify(dest)
+                    });
+                }
+            }
+
             setShowAddModal(false);
-            setNewStream({ title: '', platform: 'YOUTUBE', rtmp_url: 'rtmp://a.rtmp.youtube.com/live2', stream_key: '', playlist_path: '' });
+            setNewStream({ title: '', platform: 'YOUTUBE', rtmp_url: 'rtmp://a.rtmp.youtube.com/live2', stream_key: '', playlist_path: '', destinations: [] });
             loadAll();
             addLog(`Stream "${newStream.title}" berhasil dibuat`, 'success');
         } catch (err: any) {
@@ -123,6 +139,44 @@ export default function StreamManagement() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const generateAIMetadata = async () => {
+        if (!newStream.title) return alert('Masukkan judul dasar terlebih dahulu!');
+        try {
+            setAiLoading(true);
+            const res = await apiFetch('/api/automation/ai-metadata', {
+                method: 'POST',
+                body: JSON.stringify({ title: newStream.title })
+            });
+            setNewStream({ ...newStream, title: res.title });
+            // In a more advanced UI, we'd also set auto_description
+            addLog('AI Magic Wand: Konten berhasil dioptimasi!', 'success');
+        } catch (e: any) {
+            alert('AI Error: ' + e.message);
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const addDestination = () => {
+        setNewStream({
+            ...newStream,
+            destinations: [...newStream.destinations, { name: 'New Platform', platform: 'OTHER', rtmp_url: '', stream_key: '' }]
+        });
+    };
+
+    const updateDest = (index: number, field: string, val: string) => {
+        const next = [...newStream.destinations];
+        next[index] = { ...next[index], [field]: val };
+        setNewStream({ ...newStream, destinations: next });
+    };
+
+    const removeDest = (index: number) => {
+        setNewStream({
+            ...newStream,
+            destinations: newStream.destinations.filter((_, i) => i !== index)
+        });
     };
 
     // ── UI HELPERS ──
@@ -285,7 +339,16 @@ export default function StreamManagement() {
                         </div>
                         <div className="modal-body">
                             <div className="form-group">
-                                <label>Stream Title</label>
+                                <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    Stream Title
+                                    <button 
+                                        className={`btn-ai-magic ${aiLoading ? 'loading' : ''}`}
+                                        onClick={generateAIMetadata}
+                                        disabled={aiLoading}
+                                    >
+                                        {aiLoading ? '🪄 Thinking...' : '🪄 AI Magic Wand'}
+                                    </button>
+                                </label>
                                 <input 
                                     type="text" 
                                     placeholder="Contoh: Live Streaming 24 Jam" 
@@ -339,13 +402,48 @@ export default function StreamManagement() {
                             </div>
 
                             <div className="form-group">
-                                <label>Stream Key</label>
+                                <label>Primary Stream Key</label>
                                 <input 
                                     type="password" 
                                     placeholder="Pasi kunci siaran di sini..." 
                                     value={newStream.stream_key}
                                     onChange={e => setNewStream({...newStream, stream_key: e.target.value})}
                                 />
+                            </div>
+
+                            <hr className="modal-divider" />
+
+                            <div className="destinations-manager">
+                                <div className="dest-header">
+                                    <h3>🚀 Multi-Platform Simulcast</h3>
+                                    <button className="btn-add-dest" onClick={addDestination}>+ Add Platform</button>
+                                </div>
+                                
+                                {newStream.destinations.map((d, i) => (
+                                    <div key={i} className="dest-item-row">
+                                        <div className="dest-inputs">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Nama (Misal: TikTok Admin)" 
+                                                value={d.name} 
+                                                onChange={e => updateDest(i, 'name', e.target.value)} 
+                                            />
+                                            <input 
+                                                type="text" 
+                                                placeholder="RTMP URL" 
+                                                value={d.rtmp_url} 
+                                                onChange={e => updateDest(i, 'rtmp_url', e.target.value)} 
+                                            />
+                                            <input 
+                                                type="password" 
+                                                placeholder="Stream Key" 
+                                                value={d.stream_key} 
+                                                onChange={e => updateDest(i, 'stream_key', e.target.value)} 
+                                            />
+                                        </div>
+                                        <button className="btn-remove-dest" onClick={() => removeDest(i)}>×</button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <div className="modal-footer">

@@ -5,6 +5,7 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { AutomationEngine } from '../automationEngine';
 import config from '../config';
 import * as ytApi from '../youtubeApi';
+import { AIService } from '../services/aiService';
 
 const router = express.Router();
 
@@ -147,15 +148,32 @@ export const createAutomationRouter = (autoEngine: AutomationEngine) => {
 
     // 5. GENERIC SEO GENERATOR (For Pipeline)
     router.post('/seo', authMiddleware, async (req, res) => {
-        const { videoId, streamId } = req.body;
-        const prefixes = ['🔴 LIVE!', '🔥 NON-STOP', '🚀 24/7:', '✨ BEST OF'];
-        const autoTitle = `${prefixes[Math.floor(Math.random()*prefixes.length)]} Stream ${Date.now().toString().slice(-4)}`;
-        const autoDesc = `Otomatis dihasilkan oleh AI Pipeline.\n\n#Live #Stream #24/7`;
-        
-        if (streamId) {
-            dbLayer.db.run(`UPDATE streams SET auto_title = ?, auto_description = ? WHERE id = ?`, [autoTitle, autoDesc, streamId]);
+        const { videoId, streamId, title } = req.body;
+        try {
+            // First try AI, fallback to random if fails or no key
+            const aiData = await AIService.generateMetadata(title || 'LIVE STREAMING').catch(() => null);
+            
+            const finalTitle = aiData ? aiData.title : `🔴 LIVE! Stream ${Date.now().toString().slice(-4)}`;
+            const finalDesc = aiData ? aiData.description : `Otomatis dihasilkan oleh AI Pipeline.\n\n#Live #Stream #24/7`;
+            
+            if (streamId) {
+                dbLayer.db.run(`UPDATE streams SET auto_title = ?, auto_description = ? WHERE id = ?`, [finalTitle, finalDesc, streamId]);
+            }
+            res.json({ title: finalTitle, description: finalDesc, tags: aiData?.tags || '' });
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
         }
-        res.json({ title: autoTitle, description: autoDesc });
+    });
+
+    // 5a. AI METADATA WIZARD
+    router.post('/ai-metadata', authMiddleware, async (req, res) => {
+        const { title } = req.body;
+        try {
+            const aiData = await AIService.generateMetadata(title);
+            res.json(aiData);
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
     });
 
     // 6. THUMBNAIL GENERATOR (For Pipeline)
