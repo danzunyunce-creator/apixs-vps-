@@ -222,8 +222,17 @@ export class StreamManager {
 
     private async _spawnFFmpeg(id: string, meta: StreamMeta, currentRestartCount = 0) {
         const inputSource = meta.filepath || meta.input_source || '';
-        if (inputSource && !inputSource.includes('testsrc') && !fs.existsSync(inputSource)) {
-            const errMsg = `Gagal memulai stream: File tidak ditemukan di path: ${inputSource}`;
+        if (inputSource && !inputSource.includes('testsrc') && !fs.existsSync(inputSource) && !inputSource.startsWith('http') && !inputSource.startsWith('rtmp')) {
+            const errMsg = `Gagal memulai stream: Input source tidak valid atau tidak ditemukan.`;
+            this.emitLog(id, 'error', errMsg);
+            dbLayer.saveSystemLog(id, 'error', errMsg).catch(() => {});
+            await dbLayer.updateStreamStatus(id, 'ERROR');
+            return;
+        }
+
+        const { isSafeUrl } = require('./middleware/security');
+        if (inputSource && inputSource.startsWith('http') && !isSafeUrl(inputSource)) {
+            const errMsg = `🛡️ [Security] Blocked unauthorized internal IP access (SSRF attempt).`;
             this.emitLog(id, 'error', errMsg);
             dbLayer.saveSystemLog(id, 'error', errMsg).catch(() => {});
             await dbLayer.updateStreamStatus(id, 'ERROR');

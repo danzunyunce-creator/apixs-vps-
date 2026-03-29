@@ -20,8 +20,11 @@ import { createScheduleRouter } from './routes/schedules';
 import { createAutomationRouter } from './routes/automation';
 import settingsRoutes from './routes/settings';
 import nodesRoutes from './routes/nodes'; // Added import for nodesRoutes
+import { securityHeaders, rateLimiter } from './middleware/security';
 
 const app = express();
+app.use(securityHeaders); 
+app.use(rateLimiter);
 app.use(compression());
 app.use(cors());
 app.use(express.json());

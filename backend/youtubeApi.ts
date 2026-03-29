@@ -2,6 +2,7 @@ import { google, youtube_v3 } from 'googleapis';
 import * as dbLayer from './database';
 import { telegramService } from './telegramService';
 import https from 'https';
+import { CryptoProvider } from './utils/cryptoProvider';
 
 const httpsAgent = new https.Agent({ keepAlive: true });
 
@@ -25,10 +26,18 @@ class YoutubeApiManager {
                 if (err) return reject(err);
                 const cfg: any = {};
                 rows.forEach(r => { cfg[r.key] = r.value; });
-                if (!cfg.yt_client_id || !cfg.yt_client_secret) {
+                
+                // Decrypt sensitive OAuth config
+                const clientId = CryptoProvider.decrypt(cfg.yt_client_id);
+                const clientSecret = CryptoProvider.decrypt(cfg.yt_client_secret);
+
+                if (!clientId || !clientSecret) {
                     return reject(new Error('OAuth Credentials belum di-set di Pengaturan (Client ID / Secret).'));
                 }
-                resolve(cfg as { yt_client_id: string; yt_client_secret: string });
+                resolve({
+                    yt_client_id: clientId,
+                    yt_client_secret: clientSecret
+                });
             });
         });
     }

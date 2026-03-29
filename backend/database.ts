@@ -218,13 +218,16 @@ function createTables(): Promise<void> {
         }
       });
 
-      db.run(`CREATE TABLE IF NOT EXISTS system_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        stream_id TEXT,
-        level TEXT NOT NULL,
-        message TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )`);
+        db.run(`CREATE TABLE IF NOT EXISTS system_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stream_id TEXT,
+            level TEXT,
+            message TEXT,
+            source_ip TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+            if (err) console.error('[Database] Fatal: Failed to create system_logs table.', err);
+        });
 
       db.run(`CREATE TABLE IF NOT EXISTS nodes (
         id TEXT PRIMARY KEY,
@@ -283,6 +286,7 @@ export async function initializeDatabase(): Promise<void> {
     safeAddColumn('schedules', 'youtube_account_id', 'TEXT');
     safeAddColumn('schedules', 'is_recurring', 'INTEGER DEFAULT 0');
     safeAddColumn('users', 'user_role', "TEXT DEFAULT 'admin'");
+    safeAddColumn('system_logs', 'source_ip', 'TEXT');
   });
 
   // Seed Admin Accounts
@@ -369,11 +373,12 @@ export function logAuditEvent(userId: string, username: string, action: string, 
     [userId, username, action, targetType, targetId, details || '']);
 }
 
-export function saveSystemLog(streamId: string | null, level: string, message: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    db.run(`INSERT INTO system_logs (stream_id, level, message) VALUES (?, ?, ?)`,
-      [streamId, level, message],
-      (err) => err ? reject(err) : resolve()
+export function saveSystemLog(streamId: string | null, level: 'info' | 'warn' | 'error', message: string, ip: string | null = null): Promise<void> {
+  return new Promise((resolve) => {
+    db.run(
+      `INSERT INTO system_logs (stream_id, level, message, source_ip) VALUES (?, ?, ?, ?)`,
+      [streamId, level, message, ip],
+      () => resolve()
     );
   });
 }

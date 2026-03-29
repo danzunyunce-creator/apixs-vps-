@@ -1,6 +1,7 @@
 import express from 'express';
 import * as dbLayer from '../database';
 import { authMiddleware, adminOnly } from '../middleware/auth';
+import { CryptoProvider } from '../utils/cryptoProvider';
 
 const router = express.Router();
 
@@ -19,7 +20,15 @@ router.get('/', authMiddleware, adminOnly, (req, res) => {
     dbLayer.db.all(`SELECT * FROM app_config ORDER BY key ASC`, [], (err, rows: any[]) => {
         if (err) return res.status(500).json({ error: err.message });
         const cfg: any = {};
-        rows.forEach(r => { cfg[r.key] = r.value; });
+        const sensitiveKeys = ['yt_client_id', 'yt_client_secret'];
+        rows.forEach(r => { 
+            if (sensitiveKeys.includes(r.key) && r.value) {
+                // Return masked value to UI for security
+                cfg[r.key] = '••••••••••••••••';
+            } else {
+                cfg[r.key] = r.value; 
+            }
+        });
         res.json(cfg);
     });
 });
@@ -29,12 +38,22 @@ router.put('/', authMiddleware, adminOnly, async (req, res) => {
     const configData = req.body;
     try {
         const keys = Object.keys(configData);
+        const sensitiveKeys = ['yt_client_id', 'yt_client_secret'];
+        
         for (const key of keys) {
+            let val = configData[key];
+            if (sensitiveKeys.includes(key) && val && val !== '••••••••••••••••') {
+                val = CryptoProvider.encrypt(val);
+            } else if (sensitiveKeys.includes(key) && val === '••••••••••••••••') {
+                // If UI returns masked value, don't overwrite the existing encrypted value
+                continue; 
+            }
+
             await new Promise((resolve, reject) => {
                 dbLayer.db.run(
                     `INSERT INTO app_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
                      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
-                    [key, configData[key]],
+                    [key, val],
                     (err) => err ? reject(err) : resolve(true)
                 );
             });

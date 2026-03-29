@@ -37,8 +37,12 @@ router.post('/login', (req, res) => {
             const token = jwt.sign(
                 { id: row.id, username: row.username, role: row.user_role },
                 config.JWT_SECRET,
-                { expiresIn: '7d' }
+                { expiresIn: '24h' }
             );
+
+            // Unicorn Audit: Log Login IP
+            const ip = req.ip || req.socket.remoteAddress || 'unknown';
+            dbLayer.saveSystemLog(null, 'info', `User ${username} logged in successfully`, ip).catch(() => {});
 
             res.json({ token, user: safeUser });
         });
@@ -58,7 +62,12 @@ router.post('/register', (req, res) => {
             [id, username, hash], function (err) {
                 if (err) return res.status(500).json({ error: err.message });
                 
-                const token = jwt.sign({ id, username, role: 'user' }, config.JWT_SECRET, { expiresIn: '7d' });
+                const token = jwt.sign({ id, username, role: 'user' }, config.JWT_SECRET, { expiresIn: '24h' });
+                
+                // Unicorn Audit: Log Register IP
+                const ip = req.ip || req.socket.remoteAddress || 'unknown';
+                dbLayer.saveSystemLog(null, 'info', `New user registered: ${username}`, ip).catch(() => {});
+                
                 res.json({ message: 'User registered successfully', userId: id, token });
             });
     });
