@@ -58,6 +58,7 @@ export default function Scheduler() {
     const [filter, setFilter] = useState('ALL');
     const [showForm, setShowForm] = useState(false);
     const [channels, setChannels] = useState<any[]>([]);
+    const [videos, setVideos] = useState<any[]>([]);
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
@@ -74,12 +75,14 @@ export default function Scheduler() {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [data, chRes] = await Promise.all([
+            const [data, chRes, vidRes] = await Promise.all([
                 apiFetch('/api/schedules'),
-                apiFetch('/api/youtube/channels').catch(() => [])
+                apiFetch('/api/youtube/channels').catch(() => []),
+                apiFetch('/api/media/videos').catch(() => [])
             ]);
             setSchedules(data);
             setChannels(chRes);
+            setVideos(vidRes);
         } catch (err) {
             console.error('Failed to load schedules', err);
         } finally {
@@ -236,8 +239,13 @@ export default function Scheduler() {
                             </div>
                         )}
                         <div className="form-item">
-                            <label>Playlist/Video Path</label>
-                            <input value={formData.playlist_path} onChange={e => setFormData({...formData, playlist_path: e.target.value})} placeholder="/path/to/video.mp4" />
+                            <label>🎬 Sumber Master Video</label>
+                            <select value={formData.playlist_path} onChange={e => setFormData({...formData, playlist_path: e.target.value})} required>
+                                <option value="" disabled>Pilih Video Tersedia...</option>
+                                {videos.map(v => (
+                                    <option key={v.id} value={v.filepath}>📼 {v.title}</option>
+                                ))}
+                            </select>
                         </div>
                         <div className="form-footer full">
                             <label className="checkbox-label">
