@@ -26,18 +26,28 @@ git stash > /dev/null 2>&1
 echo "📥 [Git] Menarik kode terbaru dari GitHub..."
 git pull
 
-# 4. Kembali ke backend untuk install dan jalankan
+# 4. Update Frontend (UI)
+echo "📦 [Frontend] Mengupdate dan Mem-build React UI..."
+npm install --no-audit --no-fund --loglevel error
+npm run build
+
+# 5. Salin UI hasil build ke folder Backend
+echo "🚚 [Dist] Memindahkan file UI ke Backend..."
+rm -rf backend/dist
+cp -r dist backend/
+
+# 6. Kembali ke backend untuk install dependencies server dan jalankan
 cd "$BACKEND_DIR"
 
 echo "📦 [Deps] Cek ketersediaan modul..."
 npm install --no-audit --no-fund --loglevel error
 
-# 5. Hidupkan ulang server
+# 7. Hidupkan ulang server
 echo "⚡ [PM2] Menghidupkan ulang mesin stream..."
 ./node_modules/.bin/pm2 delete apixs-backend > /dev/null 2>&1
 ./node_modules/.bin/pm2 start server.ts --name apixs-backend --interpreter ./node_modules/.bin/tsx
 
-# 6. Simpan konfigurasi PM2 agar otomatis nyala saat VPS reboot
+# 8. Simpan konfigurasi PM2 agar otomatis nyala saat VPS reboot
 ./node_modules/.bin/pm2 save > /dev/null 2>&1
 
 echo "----------------------------------------------------"
