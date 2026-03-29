@@ -721,3 +721,38 @@ input[type="text"], input[type="password"], input[type="number"], input[type="da
     background: #475569;
     color: #ffffff;
 }
+
+/* Watchdog & Worker Buttons */
+.btn-trigger-manual, .btn-restart-server {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #ffffff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-trigger-manual:hover, .btn-restart-server:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* User Management Buttons */
+.btn-confirm-add {
+    background: linear-gradient(135deg, #10b981, #047857);
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-confirm-add:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
