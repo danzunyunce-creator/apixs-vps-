@@ -17,7 +17,8 @@ export default function VideoCompressor({ file, onComplete, onCancel }: VideoCom
     const loadFFmpeg = async () => {
         const ffmpeg = ffmpegRef.current;
         try {
-            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+            // Switch to jsdelivr to avoid 'unpkg' CORS limits blocking toBlobURL fetch
+            const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
             await ffmpeg.load({
                 coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                 wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
