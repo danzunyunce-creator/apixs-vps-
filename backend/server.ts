@@ -59,6 +59,9 @@ if (fs.existsSync(DIST_PATH)) {
 // ── Serve Frontend Fallback ──
 app.use((req, res, next) => {
     if (fs.existsSync(DIST_PATH) && !req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         return res.sendFile(path.join(DIST_PATH, 'index.html'));
     }
     next();
