@@ -18,8 +18,6 @@ interface Video {
 export default function MediaManager() {
     const [videos, setVideos] = useState<Video[]>([]);
     const [uploading, setUploading] = useState(false);
-    const [autoCompress, setAutoCompress] = useState(false); // Default false for Phase 5 manual control
-    const [compressingFile, setCompressingFile] = useState<File | null>(null);
     const [bulkPath, setBulkPath] = useState('');
     const [bulkLoading, setBulkLoading] = useState(false);
     const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
@@ -39,11 +37,6 @@ export default function MediaManager() {
 
     const handleFiles = async (files: FileList | null) => {
         if (!files || files.length === 0) return;
-        
-        if (autoCompress) {
-            setCompressingFile(files[0]);
-            return;
-        }
 
         setUploading(true);
         const formData = new FormData();
@@ -77,26 +70,6 @@ export default function MediaManager() {
                 next.delete(id);
                 return next;
             });
-        }
-    };
-
-    const onCompressionComplete = async (compressedFile: File) => {
-        setCompressingFile(null);
-        setUploading(true);
-
-        const formData = new FormData();
-        formData.append('videos', compressedFile);
-
-        try {
-            await apiFetch('/api/media/videos/upload', {
-                method: 'POST',
-                body: formData
-            });
-            await loadVideos();
-        } catch (err: any) {
-            alert(`Gagal mengunggah file hasil kompresi: ${err.message}`);
-        } finally {
-            setUploading(false);
         }
     };
 
@@ -157,14 +130,6 @@ export default function MediaManager() {
                                 <span>{uploading ? 'Sedang Mengunggah & Memproses...' : 'Klik atau Seret file Video ke sini'}</span>
                             </label>
                             {uploading && <div className="upload-loader-bar" />}
-                            
-                            <div className="compress-toggle">
-                                <label className="fancy-toggle">
-                                    <input type="checkbox" checked={autoCompress} onChange={() => setAutoCompress(!autoCompress)} />
-                                    <span className="slider" />
-                                </label>
-                                <span>Auto-Compress (Lokal)</span>
-                            </div>
                         </div>
                     </div>
 
@@ -188,14 +153,6 @@ export default function MediaManager() {
                             </button>
                         </div>
                     </div>
-
-                    {compressingFile && (
-                        <VideoCompressor 
-                            file={compressingFile} 
-                            onComplete={onCompressionComplete} 
-                            onCancel={() => setCompressingFile(null)} 
-                        />
-                    )}
                 </div>
 
                 {/* RIGHT COLUMN: VIDEO GALLERY */}
