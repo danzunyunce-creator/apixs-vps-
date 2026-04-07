@@ -19,11 +19,14 @@ export const apiFetch = async (endpoint: string, options: any = {}) => {
         }
     }
 
-    const headers = { 
-        'Content-Type': 'application/json',
+    const isFormData = options.body instanceof FormData;
+    const headers: any = { 
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options.headers 
     };
+    if (!isFormData && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+    }
 
     const response = await fetch(endpoint, { ...options, headers });
     
