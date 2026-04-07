@@ -37,7 +37,7 @@ export default function StreamManagement() {
     const socketRef = useRef<any>(null);
 
     // ── DATA FETCHING ──
-    const loadAll = async () => {
+    const loadAll = useCallback(async () => {
         try {
             setLoading(true);
             setErrorMsg(null);
@@ -54,11 +54,13 @@ export default function StreamManagement() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         loadAll();
-        
+    }, [loadAll]);
+
+    useEffect(() => {
         // Setup Socket.io connection
         const socket = io(BASE_URL || window.location.origin);
         socketRef.current = socket;
@@ -89,7 +91,7 @@ export default function StreamManagement() {
         return () => {
             socket.disconnect();
         };
-    }, [loadAll]);
+    }, []);
 
     // ── LOGIC ──
     const addLog = (msg: string, type: LogEntry['type'] = 'info') => {
