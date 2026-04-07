@@ -24,7 +24,6 @@ import { securityHeaders, rateLimiter } from './middleware/security';
 
 const app = express();
 app.use(securityHeaders); 
-app.use(rateLimiter);
 app.use(compression());
 app.use(cors());
 app.use(express.json());
@@ -42,6 +41,7 @@ const autoEngine = new AutomationEngine(streamManager);
 streamManager.attachAutomationEngine(autoEngine);
 
 // ── API Routing ──
+app.use('/api', rateLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/media', createMediaRouter(io));
 app.use('/api/streams', createStreamRouter(streamManager, io));
