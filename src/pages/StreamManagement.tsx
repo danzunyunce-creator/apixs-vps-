@@ -211,22 +211,6 @@ export default function StreamManagement() {
                 body: JSON.stringify(newStream)
             });
 
-            const streamId = newStream.id || res.id;
-
-            // Simple destination update (could be optimized on backend)
-            if (newStream.destinations.length > 0) {
-                 // For simplicity in this demo, we'll just add new ones
-                 // In production, we should handle sync properly
-                for (const dest of newStream.destinations) {
-                    if (!dest.id) { // Only add new ones
-                         await apiFetch(`/api/streams/${streamId}/destinations`, {
-                            method: 'POST',
-                            body: JSON.stringify(dest)
-                        });
-                    }
-                }
-            }
-
             setShowAddModal(false);
             resetNewStream();
             loadAll();
