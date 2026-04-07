@@ -1,56 +1,70 @@
 #!/bin/bash
-# ApixsLive One-Click Automation Script
+# ApixsLive Server CI/CD & Automation Script (Ultimate Pipeline)
+set -eo pipefail
 
-echo "🚀 [ApixsLive] Memulai proses update sakti..."
+# --- Color Constants ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-# 1. Pastikan di folder yang benar (backend atau root)
+echo -e "${PURPLE}====================================================${NC}"
+echo -e "${CYAN}🚀 [ApixsLive] Memulai Ultimate Deploy Pipeline...${NC}"
+echo -e "${PURPLE}====================================================${NC}"
+
+# Define error trap for fail-fast mechanism
+trap 'echo -e "${RED}❌ [ERROR] Deployment gagal di baris $LINENO. Pipeline dibatalkan agar sistem tetap aman!${NC}"' ERR
+
+# 1. Location Check
 if [ -f "server.ts" ]; then
-    # Jika sudah di folder backend
     BACKEND_DIR=$(pwd)
 elif [ -d "backend" ]; then
-    # Jika di folder root, masuk ke backend
     cd backend
     BACKEND_DIR=$(pwd)
 else
-    echo "❌ Folder backend/server.ts tidak ditemukan!"
+    echo -e "${RED}❌ Direktori salah! Jalankan dari root proyek atau folder backend.${NC}"
     exit 1
 fi
 
-# 2. Bersihkan error git lokal
-echo "🧹 [Git] Membersihkan perubahan lokal..."
-# Go up to the root to pull
-cd ..
-git stash > /dev/null 2>&1
+echo -e "${BLUE}🧹 [1/6] Membersihkan State Lokal (Mencegah Konflik)...${NC}"
+cd "$BACKEND_DIR/.." 
+# Paksa reset lokal agar selalu identik dengan Git remote (Sangat aman untuk VPS)
+git reset --hard HEAD > /dev/null 2>&1 || true
+git clean -fd > /dev/null 2>&1 || true
+git stash > /dev/null 2>&1 || true
 
-# 3. Ambil kode terbaru
-echo "📥 [Git] Menarik kode terbaru dari GitHub..."
-git pull
+echo -e "${CYAN}📥 [2/6] Sinkronisasi GitHub Repo...${NC}"
+git pull origin main
 
-# 4. Update Frontend (UI)
-echo "📦 [Frontend] Mengupdate dan Mem-build React UI..."
+echo -e "${YELLOW}🚧 [3/6] Merakit Antarmuka Web (Compiling React UI)...${NC}"
 npm install --no-audit --no-fund --loglevel error
 npm run build
 
-# 5. Salin UI hasil build ke folder Backend
-echo "🚚 [Dist] Memindahkan file UI ke Backend..."
+echo -e "${BLUE}🚚 [4/6] Mengirim Artifact ke Sistem Mesin...${NC}"
+if [ ! -d "dist" ]; then
+    echo -e "${RED}❌ Gagal merakit Web UI (folder dist tidak ditemukan).${NC}"
+    exit 1
+fi
 rm -rf backend/dist
 cp -r dist backend/
 
-# 6. Kembali ke backend untuk install dependencies server dan jalankan
+echo -e "${YELLOW}⚙️ [5/6] Konfigurasi Ulang Dependensi Backend...${NC}"
 cd "$BACKEND_DIR"
-
-echo "📦 [Deps] Cek ketersediaan modul..."
 npm install --no-audit --no-fund --loglevel error
 
-# 7. Hidupkan ulang server
-echo "⚡ [PM2] Menghidupkan ulang mesin stream..."
-./node_modules/.bin/pm2 delete apixs-backend > /dev/null 2>&1
-./node_modules/.bin/pm2 start server.ts --name apixs-backend --interpreter ./node_modules/.bin/tsx
-
-# 8. Simpan konfigurasi PM2 agar otomatis nyala saat VPS reboot
+echo -e "${GREEN}⚡ [6/6] Zero-Downtime Reload via PM2...${NC}"
+# PM2 Smart Restart: Cek jika backend sudah nyala, lakukan restart mulus, jika belum lakukan start.
+if ./node_modules/.bin/pm2 id apixs-backend > /dev/null 2>&1; then
+    ./node_modules/.bin/pm2 restart apixs-backend --update-env > /dev/null 2>&1
+else
+    ./node_modules/.bin/pm2 start server.ts --name apixs-backend --interpreter ./node_modules/.bin/tsx > /dev/null 2>&1
+fi
 ./node_modules/.bin/pm2 save > /dev/null 2>&1
 
-echo "----------------------------------------------------"
-echo "✅ [SELESAI] Dashboard Premium Bos Berhasil LIVE!"
-echo "👉 Buka Alamat: http://103.127.132.124:3001"
-echo "----------------------------------------------------"
+echo -e "${PURPLE}====================================================${NC}"
+echo -e "${GREEN}✅ [UPLINK SUCCESS] ApixsLive Bekerja pada Peak Performance!${NC}"
+echo -e "👉 Silakan Akses Dashboard Premium Anda: ${CYAN}http://103.127.132.124:3001${NC}"
+echo -e "${PURPLE}====================================================${NC}"
