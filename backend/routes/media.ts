@@ -127,7 +127,14 @@ router.post('/videos/:id/process', authMiddleware, async (req: AuthRequest, res)
     
     dbLayer.db.get(`SELECT id, filepath, title FROM videos WHERE id = ?`, [id], async (err, row: any) => {
         if (err) return res.status(500).json({ error: 'DB Error: ' + err.message });
-        if (!row) return res.status(404).json({ error: 'Video not found (ID: ' + id + ')' });
+        if (!row) {
+            // Diagnostic: Log what actually exists in the DB
+            dbLayer.db.all('SELECT id FROM videos LIMIT 10', (dErr, rows) => {
+                const existing = rows ? rows.map(r => r.id).join(', ') : 'none';
+                console.error(`[Process Error] Video ${id} not found. Existing IDs: ${existing}`);
+            });
+            return res.status(404).json({ error: 'Video not found (ID: ' + id + '). Pastikan file sudah terindeks.' });
+        }
         
         try {
             const input = row.filepath;
