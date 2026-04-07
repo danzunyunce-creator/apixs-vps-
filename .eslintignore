@@ -1,0 +1,6 @@
+dist/
+node_modules/
+backend/dist/
+backend/node_modules/
+*.js
+*.config.js

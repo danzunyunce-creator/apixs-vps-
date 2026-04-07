@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import { apiFetch, BASE_URL } from '../api';
 import './ModuleCommon.css';
+import './Watchdog.css';
 
-const SOCKET_URL = BASE_URL || window.location.origin.replace('5173', '3001');
+
+const SOCKET_URL = window.location.origin;
 
 export default function Watchdog() {
     const [logs, setLogs] = useState<any[]>([]);
@@ -14,7 +16,7 @@ export default function Watchdog() {
     const filteredLogs = logs.filter(l => levelFilter === 'ALL' || (l.level || '').toUpperCase() === levelFilter);
 
     useEffect(() => {
-        const socket = io(SOCKET_URL);
+        const socket = io(SOCKET_URL, { path: '/socket.io', transports: ['websocket', 'polling'] });
         
         socket.on('streamLog', (data: any) => {
             setLogs(prev => [{

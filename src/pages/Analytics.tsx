@@ -19,7 +19,7 @@ export default function Analytics() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        apiFetch('/api/analytics/summary')
+        apiFetch('/api/streams/analytics/summary')
             .then(res => setData(res))
             .catch(console.error)
             .finally(() => setLoading(false));

@@ -4,6 +4,7 @@ import * as dbLayer from './database';
 import { Server } from 'socket.io';
 import os from 'os';
 import fs from 'fs';
+import path from 'path';
 import { exec } from 'child_process';
 import config from './config';
 
@@ -20,6 +21,7 @@ export interface StreamMeta {
     channel_name?: string;
     niche?: string;
     youtube_account_id?: string;
+    auto_restart?: number | boolean;
 }
 
 export interface StreamDesc {
@@ -51,6 +53,18 @@ export class StreamManager {
         this.activeStreams = new Map();
         this.startMetricsBroadcast();
         this.probeEncoders();
+        this.setupExitHandlers();
+    }
+
+    private setupExitHandlers() {
+        const killAll = () => {
+            console.log('\n🛑 [ProcessSentinel] Server shutting down. Reaping all child processes...');
+            this.emergencyStopAll();
+        };
+
+        process.on('exit', killAll);
+        process.on('SIGINT', () => { killAll(); process.exit(); });
+        process.on('SIGTERM', () => { killAll(); process.exit(); });
     }
 
     private probeEncoders() {
@@ -116,27 +130,31 @@ export class StreamManager {
             return;
         }
 
-        streamDesc.autoRestart = false;
+        streamDesc.autoRestart = false; // Disable auto-restart logic
         if (streamDesc.restartTimer) {
             clearTimeout(streamDesc.restartTimer);
+            streamDesc.restartTimer = null;
         }
 
         console.log(`[StreamManager] Attempting graceful stop for ${id} (SIGTERM)...`);
-        streamDesc.process?.kill('SIGTERM'); // Politely ask to stop
+        
+        // Critical: Check if process is still alive before killing
+        if (streamDesc.process && !streamDesc.process.killed) {
+            streamDesc.process.kill('SIGTERM'); 
 
-        // Wait 3 seconds then force kill if still alive
-        const forceKillTimer = setTimeout(() => {
-            if (this.activeStreams.has(id)) {
-                console.log(`[StreamManager] Graceful stop timed out for ${id}. Force killing (SIGKILL)...`);
-                streamDesc.process?.kill('SIGKILL');
-                this.activeStreams.delete(id);
-            }
-        }, 3000);
+            // Wait 3 seconds then force kill if still alive
+            setTimeout(() => {
+                const stillActive = this.activeStreams.get(id);
+                if (stillActive && stillActive.process && !stillActive.process.killed) {
+                    console.log(`[StreamManager] Graceful stop timed out for ${id}. Force killing (SIGKILL)...`);
+                    stillActive.process.kill('SIGKILL');
+                }
+            }, 3000);
+        } else {
+            this.activeStreams.delete(id);
+        }
 
-        // We delete from map early so UI updates immediately
-        this.activeStreams.delete(id);
-
-        if (this.autoEngine) {
+        if (this.autoEngine && typeof this.autoEngine.onStreamStop === 'function') {
             this.autoEngine.onStreamStop(id);
         }
 
@@ -163,15 +181,18 @@ export class StreamManager {
         const args: string[] = [];
         
         // --- INDESTRUCTIBLE RECONNECT (Level Network Resilience) ---
-        args.push(
-            '-reconnect', '1', 
-            '-reconnect_at_eof', '1', 
-            '-reconnect_streamed', '1', 
-            '-reconnect_delay_max', '5',
-            '-timeout', '20000000', // 20 Seconds timeout for socket
-            '-err_detect', 'ignore_err',
-            '-thread_queue_size', '512' // Prevent buffer overflow for long streams
-        );
+        if (inputSource.startsWith('http') || inputSource.startsWith('rtmp')) {
+            args.push(
+                '-reconnect', '1', 
+                '-reconnect_at_eof', '1', 
+                '-reconnect_streamed', '1', 
+                '-reconnect_delay_max', '5',
+                '-timeout', '20000000', // 20 Seconds timeout for socket
+                '-err_detect', 'ignore_err'
+            );
+        }
+        
+        args.push('-thread_queue_size', '512'); // Prevent buffer overflow for long streams
         
         if (meta.loop_mode === 'repeat_all' || meta.loop_video) {
             args.push('-stream_loop', '-1');
@@ -253,17 +274,34 @@ export class StreamManager {
 
     private async _spawnFFmpeg(id: string, meta: StreamMeta, currentRestartCount = 0) {
         const inputSource = meta.filepath || meta.input_source || '';
-        if (inputSource && !inputSource.includes('testsrc') && !fs.existsSync(inputSource) && !inputSource.startsWith('http') && !inputSource.startsWith('rtmp')) {
-            const errMsg = `Gagal memulai stream: Input source tidak valid atau tidak ditemukan.`;
-            this.emitLog(id, 'error', errMsg);
-            dbLayer.saveSystemLog(id, 'error', errMsg).catch(() => {});
-            await dbLayer.updateStreamStatus(id, 'ERROR');
-            return;
+        
+        // --- 🛡️ PATH JAIL & SSRF PROTECTION (Expert Level) ---
+        if (inputSource && !inputSource.includes('testsrc')) {
+            if (inputSource.startsWith('http')) {
+                const { isSafeUrl } = require('./middleware/security');
+                if (!isSafeUrl(inputSource)) {
+                    const errMsg = `🛡️ [Security] Gagal: Percobaan SSRF terdeteksi (Internal IP Blocked).`;
+                    this.emitLog(id, 'error', errMsg);
+                    dbLayer.saveSystemLog(id, 'error', errMsg).catch(() => {});
+                    await dbLayer.updateStreamStatus(id, 'ERROR');
+                    return;
+                }
+            } else if (!inputSource.startsWith('rtmp')) {
+                // local path check
+                const normalizedBase = path.resolve(config.UPLOADS_DIR);
+                const normalizedTarget = path.resolve(inputSource);
+                if (!normalizedTarget.startsWith(normalizedBase) && !inputSource.includes('concat')) {
+                    const errMsg = `🛡️ [Security] Gagal: Akses file di luar jail dilarang (Path Traversal attempt).`;
+                    this.emitLog(id, 'error', errMsg);
+                    dbLayer.saveSystemLog(id, 'error', errMsg).catch(() => {});
+                    await dbLayer.updateStreamStatus(id, 'ERROR');
+                    return;
+                }
+            }
         }
 
-        const { isSafeUrl } = require('./middleware/security');
-        if (inputSource && inputSource.startsWith('http') && !isSafeUrl(inputSource)) {
-            const errMsg = `🛡️ [Security] Blocked unauthorized internal IP access (SSRF attempt).`;
+        if (inputSource && !inputSource.includes('testsrc') && !fs.existsSync(inputSource) && !inputSource.startsWith('http') && !inputSource.startsWith('rtmp')) {
+            const errMsg = `Gagal memulai stream: Input source tidak valid atau tidak ditemukan.`;
             this.emitLog(id, 'error', errMsg);
             dbLayer.saveSystemLog(id, 'error', errMsg).catch(() => {});
             await dbLayer.updateStreamStatus(id, 'ERROR');
@@ -277,7 +315,7 @@ export class StreamManager {
 
             const streamDesc: StreamDesc = {
                 process: ffmpegProc,
-                autoRestart: true,
+                autoRestart: meta.auto_restart !== undefined ? Boolean(meta.auto_restart) : true,
                 restartTimer: null,
                 lastLogTime: 0,
                 startedAt: Date.now(),
@@ -291,10 +329,10 @@ export class StreamManager {
 
             this.activeStreams.set(id, streamDesc);
 
-            // Mask sensitive stream key in logs
+            // Mask sensitive stream key in logs targeting URLs
             const maskedArgs = args.map(arg => {
                 const streamKey = meta.stream_key || '';
-                if (streamKey && arg.includes(streamKey)) {
+                if (streamKey && (arg.startsWith('rtmp://') || arg.startsWith('http'))) {
                     return arg.replace(streamKey, '••••••••••••');
                 }
                 return arg;
@@ -306,6 +344,7 @@ export class StreamManager {
 
             if (this.autoEngine && currentRestartCount === 0) {
                 this.autoEngine.onStreamStart(id, meta);
+                telegramService.sendMessage(`🟢 <b>LIVE!</b> Stream starting ID: <b>${id}</b>\nNode: ${meta.server_id || 'Main VPS'}`).catch(() => {});
             }
 
             ffmpegProc.stdout?.on('data', () => {});
@@ -369,10 +408,12 @@ export class StreamManager {
 
                 this.emitLog(id, 'warn', `FFmpeg proc closed (code ${code}).`);
 
+                // ONLY DELETE FROM MAP ON ACTUAL CLOSE
                 this.activeStreams.delete(id);
 
-                if (this.autoEngine) {
+                if (this.autoEngine && typeof this.autoEngine.onStreamStop === 'function') {
                     this.autoEngine.onStreamStop(id);
+                    telegramService.sendMessage(`🔴 <b>STOPPED / OFFLINE!</b> Stream ID: <b>${id}</b>`).catch(() => {});
                 }
 
                 if (desc && desc.autoRestart) {

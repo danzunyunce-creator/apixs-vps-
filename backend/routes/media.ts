@@ -125,17 +125,28 @@ router.post('/videos/:id/process', authMiddleware, async (req: AuthRequest, res)
     const { id } = req.params;
     const { targetRes } = req.body; // e.g. 720, 1080
     
-    dbLayer.db.get(`SELECT filepath FROM videos WHERE id = ?`, [id], async (err, row: any) => {
+    dbLayer.db.get(`SELECT id, filepath, title FROM videos WHERE id = ?`, [id], async (err, row: any) => {
         if (!row) return res.status(404).json({ error: 'Video not found' });
         
         try {
             const input = row.filepath;
-            // The process is handled in background by mediaProcessor
             const resStr = String(targetRes || '720');
-            mediaProcessor.compressVideo(id as string, input as string, resStr)
-                .catch(err => console.error(`[Process Error] ${id}:`, err));
+            const videoId = id as string;
+            const videoTitle = row.title as string;
+            
+            // Mark as processing in DB (Optional, but good for UI)
+            dbLayer.saveSystemLog(videoId, 'info', `🎬 Optimization started for "${videoTitle}" to ${resStr}p`).catch(() => {});
+            
+            mediaProcessor.compressVideo(videoId, input as string, resStr)
+                .then((newPath) => {
+                    dbLayer.saveSystemLog(videoId, 'info', `✅ Optimization finished for "${videoTitle}". New path: ${newPath}`).catch(() => {});
+                })
+                .catch(err => {
+                    console.error(`[Process Error] ${videoId}:`, err);
+                    dbLayer.saveSystemLog(videoId, 'error', `❌ Optimization failed for "${videoTitle}": ${err.message}`).catch(() => {});
+                });
 
-            res.json({ message: 'Optimization started in background', id });
+            res.json({ message: 'Optimization task queued successfully', id });
         } catch (err: any) {
             res.status(500).json({ error: 'Failed to start processing: ' + err.message });
         }

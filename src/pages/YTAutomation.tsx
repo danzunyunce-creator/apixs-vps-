@@ -54,7 +54,7 @@ export default function YTAutomation() {
             setLogs(logsRes);
             
             // Calc stats
-            const sRes = await apiFetch('/api/analytics/summary'); // reuse existing summary
+            const sRes = await apiFetch('/api/streams/analytics/summary'); // reuse existing summary
             setStats({
                 active: jobs.filter(j => j.stage !== 'COMPLETE' && j.stage !== 'ERROR').length,
                 completed: sRes.totalSessions || 0,

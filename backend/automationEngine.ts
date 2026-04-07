@@ -166,17 +166,17 @@ export class AutomationEngine {
         });
     }
 
-    private checkSystemHealth() {
+    private async checkSystemHealth() {
         // 1. Check RAM
         const freeMem = os.freemem();
         const totalMem = os.totalmem();
         const ramUsagePercent = ((totalMem - freeMem) / totalMem) * 100;
 
-        if (ramUsagePercent > 90) {
+        if (ramUsagePercent > 92) {
             telegramService.sendMessage(`⚠️ <b>CRITICAL RAM USAGE:</b> ${ramUsagePercent.toFixed(1)}%\nSistem mungkin akan melambat atau crash.`).catch(() => {});
         }
 
-        // 2. Check Disk Space (Windows/Linux Cross-Platform)
+        // 2. Check Disk Space & Sentinel Power-Purge
         try {
             const stats = fs.statfsSync(config.UPLOADS_DIR);
             const total = stats.blocks * stats.bsize;
@@ -184,13 +184,59 @@ export class AutomationEngine {
             const usagePercent = ((total - free) / total) * 100;
             const availableGB = (free / (1024 * 1024 * 1024)).toFixed(1);
 
-            if (usagePercent > 90) {
-                const sosMsg = `🚨 <b>SOS: DISK SPACE ALIVE!</b>\nPenyimpanan sisa ${availableGB} GB (${usagePercent.toFixed(1)}% terpakai).\nSegera hapus video lama di Media Manager!`;
+            if (usagePercent > 95) {
+                const sosMsg = `🚨 <b>SOS: DISK SPACE FULL! (${usagePercent.toFixed(1)}%)</b>\nSentinel Auto-Purge AKTIF. Membersihkan data sampah non-esensial...`;
                 telegramService.sendMessage(sosMsg).catch(() => {});
                 console.error('[Sentinel] ' + sosMsg);
+                
+                // Execute emergency purge
+                this.emergencyPurge();
+            } else if (usagePercent > 85) {
+                telegramService.sendMessage(`⚠️ <b>WARNING:</b> Disk Space sisa ${availableGB} GB (${usagePercent.toFixed(1)}% terpakai).`).catch(() => {});
             }
         } catch (e) {
             console.error('[Sentinel] Failed to check disk health:', e);
+        }
+    }
+
+    private emergencyPurge() {
+        console.log('🧹 [Sentinel] Emergency Purge Initiated...');
+        try {
+            // Priority 1: Old Proc Files (> 12 hours)
+            const files = fs.readdirSync(config.UPLOADS_DIR);
+            const now = Date.now();
+            let count = 0;
+            
+            files.forEach(f => {
+                const fullPath = path.join(config.UPLOADS_DIR, f);
+                const stats = fs.statSync(fullPath);
+                const ageHours = (now - stats.mtimeMs) / 3600000;
+
+                if (f.includes('_proc_') && ageHours > 12) {
+                    fs.unlinkSync(fullPath);
+                    count++;
+                }
+            });
+
+            // Priority 2: Old Thumbnails (> 3 days)
+            const thumbDir = path.join(config.UPLOADS_DIR, 'thumbnails');
+            if (fs.existsSync(thumbDir)) {
+                fs.readdirSync(thumbDir).forEach(t => {
+                    const tPath = path.join(thumbDir, t);
+                    const tStats = fs.statSync(tPath);
+                    const ageDays = (now - tStats.mtimeMs) / (3600000 * 24);
+                    if (ageDays > 3) {
+                        fs.unlinkSync(tPath);
+                        count++;
+                    }
+                });
+            }
+
+            if (count > 0) {
+                telegramService.sendMessage(`🧼 <b>SENTINEL PURGE:</b> Berhasil menghapus <b>${count} file sampah</b> untuk melegakan storage.`).catch(() => {});
+            }
+        } catch (e) {
+            console.error('[Sentinel] Purge error:', e);
         }
     }
 
@@ -329,6 +375,15 @@ export class AutomationEngine {
 
         if (await this.isRuleEnabled('Auto-Stop Duration')) {
             this.setupAutoEnd(streamId);
+        }
+    }
+
+    onStreamStop(streamId: string) {
+        // Clear auto-end timer if it was set
+        if (this.autoEndTimers.has(streamId)) {
+            clearTimeout(this.autoEndTimers.get(streamId)!);
+            this.autoEndTimers.delete(streamId);
+            this.sm.emitLog(streamId, 'info', `[Automations] Auto-Stop timer cleared.`);
         }
     }
 

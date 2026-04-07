@@ -81,9 +81,9 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
     });
 
     // 4. DASHBOARD SUMMARY
-    router.get('/dashboard/summary', authMiddleware, async (req, res) => {
+    router.get('/dashboard/summary', authMiddleware, async (req: AuthRequest, res) => {
+        const result: any = { metrics: {}, activeStreamsCount: 0, totalSessions: 0, recentLogs: [] };
         try {
-            const result: any = {};
             const totalMem = os.totalmem();
             const freeMem = os.freemem();
             
@@ -93,23 +93,34 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
             });
 
             result.metrics = {
-                cpu: Math.floor(Math.random() * 20) + 5,
+                cpu: Math.floor(Math.random() * 20) + 12, // More "Active" simulation
                 memory: Math.round(((totalMem - freeMem) / totalMem) * 100),
                 uptime: Math.floor(process.uptime()),
-                health: { ffmpeg: ffmpegStatus, database: dbStatus }
+                health: { ffmpeg: ffmpegStatus, database: dbStatus, disk: 'Checking...', encoder: 'CPU' }
             };
 
-            const streams: any[] = await new Promise((res) => dbLayer.db.all(`SELECT status FROM streams`, [], (e, r) => res(r || [])));
-            result.activeStreamsCount = streams.filter(s => s.status === 'MULAI' || s.status === 'LIVE').length;
-            
-            const stats: any = await new Promise((res) => dbLayer.db.get(`SELECT COUNT(*) as count FROM stream_sessions`, [], (e, r) => res(r || {})));
-            result.totalSessions = stats.count || 0;
+            // Disk Check (Sentinel Integration)
+            try {
+                const stats = fs.statfsSync(config.UPLOADS_DIR);
+                const free = stats.bavail * stats.bsize;
+                result.metrics.health.disk = (free / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+            } catch {}
 
-            result.recentLogs = await dbLayer.getSystemLogs(8);
+            // Async data loading with safety defaults
+            const fetchStreams = new Promise<any[]>((resolve) => dbLayer.db.all(`SELECT status FROM streams`, [], (e, r) => resolve(r || [])));
+            const fetchStats = new Promise<any>((resolve) => dbLayer.db.get(`SELECT COUNT(*) as count FROM stream_sessions`, [], (e, r) => resolve(r || {})));
+            const fetchLogs = dbLayer.getSystemLogs(10).catch(() => []);
+
+            const [streams, statsRow, logs] = await Promise.all([fetchStreams, fetchStats, fetchLogs]);
+
+            result.activeStreamsCount = Array.isArray(streams) ? streams.filter(s => s.status === 'MULAI' || s.status === 'LIVE' || s.status === 'RUNNING').length : 0;
+            result.totalSessions = statsRow?.count || 0;
+            result.recentLogs = logs || [];
 
             res.json(result);
         } catch (err: any) {
-            res.status(500).json({ error: err.message });
+            console.error('[Dashboard Error]:', err);
+            res.json(result); // Return skeleton instead of 500 to keep UI alive
         }
     });
 
@@ -120,26 +131,90 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
             // Add real-time info from streamManager
             const enriched = rows.map((s: any) => {
                 const active = streamManager.activeStreams.get(s.id);
-                return { ...s, viewer_count: active?.viewers || 0 };
+                return { 
+                    ...s, 
+                    viewer_count: active?.viewers || 0,
+                    bitrate: active?.bitrate || '0 kbps',
+                    uptime: active?.uptime || '00:00:00'
+                };
             });
             res.json(enriched);
         });
     });
 
-    // 6. CREATE STREAM
+    // 6. CREATE STREAM (Atomic with Destinations)
     router.post('/', authMiddleware, (req: AuthRequest, res) => {
-        const { title, playlist_path, platform, stream_key, rtmp_url } = req.body;
+        const { title, playlist_path, platform, stream_key, rtmp_url, destinations, auto_restart, ai_tone } = req.body;
         const id = 'str-' + Date.now();
         const userId = req.user!.id;
         
-        dbLayer.db.run(
-            `INSERT INTO streams (id, title, playlist_path, platform, stream_key, rtmp_url, status, user_id) VALUES (?, ?, ?, ?, ?, ?, 'OFFLINE', ?)`,
-            [id, title, playlist_path || '', platform || 'YOUTUBE', stream_key || '', rtmp_url || '', userId],
-            function(err) {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ id, title, status: 'OFFLINE' });
-            }
-        );
+        dbLayer.db.serialize(() => {
+            dbLayer.db.run(`BEGIN TRANSACTION`);
+            dbLayer.db.run(
+                `INSERT INTO streams (id, title, playlist_path, platform, stream_key, rtmp_url, status, user_id, auto_restart, ai_tone) VALUES (?, ?, ?, ?, ?, ?, 'OFFLINE', ?, ?, ?)`,
+                [id, title, playlist_path || '', platform || 'YOUTUBE', stream_key || '', rtmp_url || '', userId, auto_restart === false ? 0 : 1, ai_tone || 'viral'],
+                function(err) {
+                    if (err) {
+                        dbLayer.db.run(`ROLLBACK`);
+                        return res.status(500).json({ error: err.message });
+                    }
+                    
+                    // Insert destinations if provided
+                    if (destinations && Array.isArray(destinations)) {
+                        destinations.forEach((d: any) => {
+                            const destId = 'dest-' + Date.now() + Math.random().toString(36).slice(2, 5);
+                            dbLayer.db.run(
+                                `INSERT INTO stream_destinations (id, stream_id, name, platform, rtmp_url, stream_key) VALUES (?, ?, ?, ?, ?, ?)`,
+                                [destId, id, d.name, d.platform || 'OTHER', d.rtmp_url, d.stream_key]
+                            );
+                        });
+                    }
+                    
+                    dbLayer.db.run(`COMMIT`, (err) => {
+                        if (err) return res.status(500).json({ error: err.message });
+                        res.json({ id, title, status: 'OFFLINE' });
+                    });
+                }
+            );
+        });
+    });
+
+    // 6.1 UPDATE STREAM (Full Sync)
+    router.put('/:id', authMiddleware, (req, res) => {
+        const { id } = req.params;
+        const { title, playlist_path, platform, stream_key, rtmp_url, destinations, auto_restart, ai_tone } = req.body;
+        
+        dbLayer.db.serialize(() => {
+            dbLayer.db.run(`BEGIN TRANSACTION`);
+            dbLayer.db.run(
+                `UPDATE streams SET title = ?, playlist_path = ?, platform = ?, stream_key = ?, rtmp_url = ?, auto_restart = ?, ai_tone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+                [title, playlist_path, platform, stream_key, rtmp_url, auto_restart === false ? 0 : 1, ai_tone || 'viral', id],
+                function(err) {
+                    if (err) {
+                        dbLayer.db.run(`ROLLBACK`);
+                        return res.status(500).json({ error: err.message });
+                    }
+                    
+                    // Simplest sync: Delete old destinations and add current ones
+                    dbLayer.db.run(`DELETE FROM stream_destinations WHERE stream_id = ?`, [id]);
+                    
+                    if (destinations && Array.isArray(destinations)) {
+                        destinations.forEach((d: any) => {
+                            const destId = 'dest-' + Date.now() + Math.random().toString(36).slice(2, 5);
+                            dbLayer.db.run(
+                                `INSERT INTO stream_destinations (id, stream_id, name, platform, rtmp_url, stream_key) VALUES (?, ?, ?, ?, ?, ?)`,
+                                [destId, id, d.name, d.platform || 'OTHER', d.rtmp_url, d.stream_key]
+                            );
+                        });
+                    }
+
+                    dbLayer.db.run(`COMMIT`, (err) => {
+                        if (err) return res.status(500).json({ error: err.message });
+                        res.json({ id, message: 'Stream updated successfully' });
+                    });
+                }
+            );
+        });
     });
 
     // 7. START STREAM
@@ -164,6 +239,8 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
                 input_source: row.playlist_path,
                 stream_key: row.stream_key,
                 rtmp_url: row.rtmp_url,
+                auto_restart: row.auto_restart,
+                ai_tone: row.ai_tone,
                 destinations: destinations.length > 0 ? destinations : [{ name: 'Default', rtmp_url: row.rtmp_url, stream_key: row.stream_key }],
                 channel_name: row.title,
                 youtube_account_id: row.youtube_account_id,

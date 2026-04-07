@@ -1,4 +1,9 @@
-import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import { TOKEN_KEY } from './api';
+import { 
+  Layout, Calendar, Clock, Play, Pause, Trash2, 
+  Settings as SettingsIcon, Save, Plus, AlertCircle, ExternalLink 
+} from 'lucide-react';
 import './App.css';
 
 /* ═══════════════════════════════════════════════
@@ -248,6 +253,34 @@ function DeviceSelector({ device, setDevice }: DeviceSelectorProps) {
 }
 
 /* ═══════════════════════════════════════════════
+   ERROR BOUNDARY
+   ═══════════════════════════════════════════════ */
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#f43f5e', background: 'rgba(244,63,94,0.05)', borderRadius: '12px', border: '1px solid rgba(244,63,94,0.2)', margin: '20px' }}>
+          <h2>⚠️ Modul Gagal Dimuat</h2>
+          <p>Terjadi kesalahan saat memuat komponen ini. Silakan coba segarkan halaman.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ marginTop: '15px', padding: '10px 20px', background: '#f43f5e', border: 'none', borderRadius: '8px', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            REFRESH HALAMAN
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ═══════════════════════════════════════════════
    APP ROOT
    ═══════════════════════════════════════════════ */
 function App() {
@@ -319,9 +352,11 @@ function App() {
     setCurrentUser(null);
     localStorage.removeItem('apixs_auth');
     localStorage.removeItem('apixs_userData');
+    localStorage.removeItem('apixs_currentUser');
+    localStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem('apixs_auth');
     sessionStorage.removeItem('apixs_userData');
-    localStorage.removeItem('apixs_currentUser');
+    sessionStorage.removeItem(TOKEN_KEY);
   };
 
   if (!isAuthenticated) {
@@ -420,43 +455,50 @@ function App() {
       {isDrawerOpen && <div className="drawer-overlay" onClick={() => setIsDrawerOpen(false)}></div>}
 
       <main className="dashboard-content">
-        <Suspense fallback={<div className="page-loader">Memuat Modul...</div>}>
-            <div style={{ display: activePage === 'dashboard' ? 'block' : 'none' }}>
-                {cachedPages['dashboard'] && <Dashboard />}
-            </div>
-            <div style={{ display: activePage === 'streams' ? 'block' : 'none' }}>
-                {cachedPages['streams'] && <StreamManagement />}
-            </div>
-            <div style={{ display: activePage === 'automation' ? 'block' : 'none' }}>
-                {cachedPages['automation'] && <YTAutomation />}
-            </div>
-            <div style={{ display: activePage === 'media' ? 'block' : 'none' }}>
-                {cachedPages['media'] && <MediaManager />}
-            </div>
-            <div style={{ display: activePage === 'scheduler' ? 'block' : 'none' }}>
-                {cachedPages['scheduler'] && <Scheduler />}
-            </div>
-            <div style={{ display: activePage === 'watchdog' ? 'block' : 'none' }}>
-                {cachedPages['watchdog'] && <Watchdog />}
-            </div>
-            <div style={{ display: activePage === 'channels' ? 'block' : 'none' }}>
-                {cachedPages['channels'] && <ChannelManager />}
-            </div>
-            {isAdmin && (
-                <div style={{ display: activePage === 'users' ? 'block' : 'none' }}>
-                    {cachedPages['users'] && <UserManagement />}
+        <ErrorBoundary>
+            <Suspense fallback={
+                <div className="page-loader" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: '#6366f1' }}>
+                    <div className="loader-spinner" style={{ width: '40px', height: '40px', border: '3px solid rgba(99,102,241,0.1)', borderTop: '3px solid #6366f1', borderRadius: '50%', marginBottom: '20px' }}></div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, letterSpacing: '2px' }}>DATA SYNCHRONIZING...</div>
                 </div>
-            )}
-            <div style={{ display: activePage === 'settings' ? 'block' : 'none' }}>
-                {cachedPages['settings'] && <Settings />}
-            </div>
-            <div style={{ display: activePage === 'analytics' ? 'block' : 'none' }}>
-                {cachedPages['analytics'] && <Analytics />}
-            </div>
-            <div style={{ display: activePage === 'ultimate' ? 'block' : 'none' }}>
-                {cachedPages['ultimate'] && <UltimateAutomation />}
-            </div>
-        </Suspense>
+            }>
+                <div style={{ display: activePage === 'dashboard' ? 'block' : 'none' }}>
+                    {cachedPages['dashboard'] && <Dashboard />}
+                </div>
+                <div style={{ display: activePage === 'streams' ? 'block' : 'none' }}>
+                    {cachedPages['streams'] && <StreamManagement />}
+                </div>
+                <div style={{ display: activePage === 'automation' ? 'block' : 'none' }}>
+                    {cachedPages['automation'] && <YTAutomation />}
+                </div>
+                <div style={{ display: activePage === 'media' ? 'block' : 'none' }}>
+                    {cachedPages['media'] && <MediaManager />}
+                </div>
+                <div style={{ display: activePage === 'scheduler' ? 'block' : 'none' }}>
+                    {cachedPages['scheduler'] && <Scheduler />}
+                </div>
+                <div style={{ display: activePage === 'watchdog' ? 'block' : 'none' }}>
+                    {cachedPages['watchdog'] && <Watchdog />}
+                </div>
+                <div style={{ display: activePage === 'channels' ? 'block' : 'none' }}>
+                    {cachedPages['channels'] && <ChannelManager />}
+                </div>
+                {isAdmin && cachedPages['users'] && (
+                    <div style={{ display: activePage === 'users' ? 'block' : 'none' }}>
+                         <UserManagement />
+                    </div>
+                )}
+                <div style={{ display: activePage === 'settings' ? 'block' : 'none' }}>
+                    {cachedPages['settings'] && <Settings />}
+                </div>
+                <div style={{ display: activePage === 'analytics' ? 'block' : 'none' }}>
+                    {cachedPages['analytics'] && <Analytics />}
+                </div>
+                <div style={{ display: activePage === 'ultimate' ? 'block' : 'none' }}>
+                    {cachedPages['ultimate'] && <UltimateAutomation />}
+                </div>
+            </Suspense>
+        </ErrorBoundary>
       </main>
     </>
   );

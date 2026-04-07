@@ -1,22 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Activity, Eye, Cpu, HardDrive, Zap, Shield, 
+  Server, Clock, AlertTriangle, RefreshCw 
+} from 'lucide-react';
 import { apiFetch } from '../api';
 import './ModuleCommon.css';
 import { 
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
-  AreaChart, Area, CartesianGrid 
+  AreaChart, Area 
 } from 'recharts';
 import toast, { Toaster } from 'react-hot-toast';
 import io from 'socket.io-client';
 import { BASE_URL } from '../api';
 
-const SOCKET_URL = BASE_URL || window.location.origin.replace('5173', '3001');
-
-const ActivityIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>;
-const CpuIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" /></svg>;
-const EyeIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
-const ServerIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6" y2="6"/><line x1="6" y1="18" x2="6" y2="18"/></svg>;
-const DiskIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="3" width="20" height="18" rx="2" ry="2" /><line x1="2" y1="12" x2="22" y2="12" /></svg>;
-const EngineIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
+// Connect via Vite proxy (same origin) — avoids CORS & direct port issues
+const SOCKET_URL = window.location.origin;
 
 interface DashboardPayload {
   metrics: {
@@ -28,12 +27,26 @@ interface DashboardPayload {
   timestamp: string;
 }
 
+const METRIC_COLORS: any = {
+    indigo: '#6366f1',
+    emerald: '#10b981',
+    rose: '#f43f5e',
+    amber: '#f59e0b',
+    cyan: '#06b6d4',
+    violet: '#8b5cf6'
+};
+
 export default function Dashboard() {
-    const [metrics, setMetrics] = useState({ cpu: 0, memory: 0, activeStreams: 0, totalViews: 0, health: null as any });
+    const [metrics, setMetrics] = useState({ 
+        cpu: 0, 
+        memory: 0, 
+        activeStreams: 0, 
+        totalViews: 0, 
+        health: { ffmpeg: '...', database: '...', disk: '...' } as any 
+    });
     const [streams, setStreams] = useState<any[]>([]);
     const [cpuHistory, setCpuHistory] = useState<any[]>([]);
     const [memoryHistory, setMemoryHistory] = useState<any[]>([]);
-    const [recentLogs, setRecentLogs] = useState<any[]>([]);
     const [activities, setActivities] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [now, setNow] = useState(new Date());
@@ -43,89 +56,73 @@ export default function Dashboard() {
         return () => clearInterval(id);
     }, []);
 
-    // REAL-TIME CONNECTION
     useEffect(() => {
-        const socket = io(SOCKET_URL);
+        const socket = io(SOCKET_URL, {
+            path: '/socket.io',
+            transports: ['websocket', 'polling']
+        });
+        
+        // Fallback: if socket takes too long, stop loading anyway
+        const loadingTimeout = setTimeout(() => setLoading(false), 5000);
+
+        socket.on('connect', () => {
+            console.log('[Dashboard] Socket.IO connected via proxy');
+            clearTimeout(loadingTimeout);
+        });
+
+        socket.on('connect_error', (err) => {
+            console.warn('[Dashboard] Socket.IO connect error:', err.message);
+            setLoading(false);
+        });
         
         socket.on('DASHBOARD_UPDATE', (payload: DashboardPayload) => {
             setLoading(false);
-            setMetrics(prev => ({
-                ...prev,
-                cpu: payload.metrics.cpu,
-                memory: payload.metrics.memory,
-                health: payload.metrics.health,
-                activeStreams: payload.streams.length
-            }));
-            setStreams(payload.streams);
+            if (payload && payload.metrics) {
+                setMetrics(prev => ({
+                    ...prev,
+                    cpu: payload.metrics.cpu,
+                    memory: payload.metrics.memory,
+                    health: payload.metrics.health || prev.health,
+                    activeStreams: payload.streams?.length || 0
+                }));
+                setStreams(payload.streams || []);
 
-            const timeLabel = new Date().toLocaleTimeString('id-ID', { hour12: false });
-            
-            setCpuHistory(prev => [...prev.slice(-15), { time: timeLabel, value: payload.metrics.cpu }]);
-            setMemoryHistory(prev => [...prev.slice(-15), { time: timeLabel, value: payload.metrics.memory }]);
-
-            // Alerts
-            if (payload.metrics.cpu > 90) toast.error('🚨 CPU Overload Alert!');
-            if (payload.metrics.health.ffmpeg !== 'OK') toast.error('⚠️ FFmpeg Service Error!');
-            
-            payload.streams.forEach(s => {
-                if (s.status === 'ERROR') toast.error(`❌ Stream ${s.id} Down!`, { id: `err-${s.id}` });
-                if (s.fps < 15 && s.fps > 0) toast(`⚠️ Low FPS on ${s.id}`, { icon: '⚠️', id: `fps-${s.id}` });
-            });
+                const timeLabel = new Date().toLocaleTimeString('id-id', { hour12: false });
+                setCpuHistory(prev => [...prev.slice(-14), { time: timeLabel, value: payload.metrics.cpu }]);
+                setMemoryHistory(prev => [...prev.slice(-14), { time: timeLabel, value: payload.metrics.memory }]);
+            }
         });
 
-        socket.on('stream_metrics', (metricsUpdate: any) => {
-            setStreams(prev => prev.map(s => {
-                if (metricsUpdate[s.id]) {
-                    return { ...s, ...metricsUpdate[s.id], status: 'OK' };
-                }
-                return s;
-            }));
-        });
-
-        socket.on('system_alert', (alert: any) => {
-            toast(alert.message, {
-                icon: '🚨',
-                duration: 6000,
-                style: { border: '2px solid #ef4444', color: '#ef4444' }
-            });
-        });
-
-        // Initial Load for static data
         const initialLoad = async () => {
             try {
-                const data = await apiFetch('/api/streams/dashboard/summary');
-                setMetrics(prev => ({ 
-                    ...prev, 
-                    totalViews: data.totalSessions || 0,
-                    cpu: data.metrics?.cpu || 0,
-                    memory: data.metrics?.memory || 0,
-                    health: data.metrics?.health || null,
-                    activeStreams: data.activeStreamsCount || 0
-                }));
-                setStreams(data.activeStreams || []);
-                setRecentLogs(data.recentLogs || []);
-                setActivities(data.activities || []);
+                const data = await apiFetch('/api/streams/dashboard/summary', { skipCache: true });
+                if (data) {
+                    setMetrics(prev => ({ 
+                        ...prev, 
+                        totalViews: data.totalSessions || 0,
+                        cpu: data.metrics?.cpu || 0,
+                        memory: data.metrics?.memory || 0,
+                        health: data.metrics?.health || prev.health,
+                        activeStreams: data.activeStreamsCount || 0
+                    }));
+                    setStreams(data.activeStreams || []);
+                    setActivities(data.activities || []);
+                }
             } catch (err) {
-                console.error('Failed to load initial dashboard data', err);
+                console.error('Dashboard Load Error:', err);
+                toast.error('Gagal memuat ringkasan dashboard.');
             } finally {
                 setLoading(false);
+                clearTimeout(loadingTimeout);
             }
         };
         initialLoad();
 
-        return () => { socket.disconnect(); };
+        return () => { 
+            socket.disconnect();
+            clearTimeout(loadingTimeout);
+        };
     }, []);
-
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const hours = now.getHours();
-    const timeStr = `${pad(hours)}:${pad(now.getMinutes())}`;
-    const seconds = pad(now.getSeconds());
-    const dateStr = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
-    
-    let greeting = 'SELAMAT MALAM';
-    if (hours >= 5 && hours < 12) greeting = 'SELAMAT PAGI';
-    else if (hours >= 12 && hours < 15) greeting = 'SELAMAT SIANG';
-    else if (hours >= 15 && hours < 18) greeting = 'SELAMAT SORE';
 
     const triggerRestart = async (id: string) => {
         toast.promise(apiFetch(`/api/streams/${id}/start`, { method: 'POST' }), {
@@ -135,142 +132,232 @@ export default function Dashboard() {
         });
     };
 
-    if (loading) return <div className="dashboard-container"><div className="loader-center">OPTIMIZING REAL-TIME ENGINE...</div></div>;
+    if (loading) return (
+        <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0b0f19' }}>
+            <motion.div 
+                animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                style={{ width: '60px', height: '60px', borderRadius: '50%', border: '3px solid #6366f1', borderTopColor: 'transparent', marginBottom: '20px' }}
+            />
+            <div className="loader-text" style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '4px', color: '#6366f1' }}>
+                ENGAGING COMMAND CENTER...
+            </div>
+        </div>
+    );
+
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    };
+
+    const cardVariants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0 }
+    };
 
     return (
-        <div className="dashboard-container">
+        <motion.div 
+            className="dashboard-container"
+            initial="hidden"
+            animate="visible"
+            variants={containerVariants}
+            style={{ padding: '30px', maxWidth: '1600px', margin: '0 auto' }}
+        >
             <Toaster position="top-right" toastOptions={{ style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' } }} />
             
-            <div className="db-header">
-                <div className="db-title">
-                    <div className="db-welcome-premium">
-                        <div className="dw-greeting">
-                            <span className="g-text">{greeting}, ADMIN</span>
-                            <span className="g-time">{timeStr}<small>:{seconds}</small></span>
-                            <div className="dw-health-subtle">
-                                <div className={`h-dot ${metrics?.health?.ffmpeg === 'OK' ? 'ok' : 'err'}`} title={`FFMPEG: ${metrics?.health?.ffmpeg}`} />
-                                <div className={`h-dot ${metrics?.health?.database === 'OK' ? 'ok' : 'err'}`} title={`DATABASE: ${metrics?.health?.database}`} />
-                            </div>
-                        </div>
-                        <div className="dw-date">{dateStr}</div>
+            {/* ELITE HEADER */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '30px' }}>
+                <div>
+                    <motion.h1 style={{ fontSize: '2.5rem', marginBottom: '5px', color: 'white' }}>Terminal Overview</motion.h1>
+                    <div className="sub-header">
+                        Broadcasting Operations • {now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </div>
+                </div>
+                <div style={{ textAlign: 'right', color: 'white' }}>
+                    <div style={{ fontSize: '2rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                        {now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '5px' }}>
+                        <HealthBadge label="FFMPEG" ok={metrics.health?.ffmpeg === 'OK'} />
+                        <HealthBadge label="STREAMS" ok={metrics.activeStreams > 0} />
+                        <HealthBadge label="DATABASE" ok={metrics.health?.database === 'OK'} />
                     </div>
                 </div>
             </div>
 
             {/* METRICS GRID */}
-            <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                <MetricCard icon={<ActivityIcon />} label="ACTIVE" sub="RUNNING INSTANCES" value={metrics.activeStreams} color="blue" />
-                <MetricCard icon={<EyeIcon />} label="VIEWS" sub="ACCUMULATED REACH" value={metrics.totalViews.toLocaleString()} color="green" />
-                <MetricCard icon={<CpuIcon />} label="CPU" sub="PROCESSOR LOAD" value={`${metrics.cpu}%`} color="purple" />
-                <MetricCard icon={<ServerIcon />} label="RAM" sub="MEMORY UTILIZATION" value={`${metrics.memory}%`} color="orange" />
-                <MetricCard icon={<DiskIcon />} label="STORAGE" sub="FREE SPACE AVAILABLE" value={metrics?.health?.disk || 'PROBING...'} color="cyan" />
-                <MetricCard icon={<EngineIcon />} label="ENGINE" sub="ACTIVE HW ENCODER" value={metrics?.health?.encoder || 'CPU'} color="indigo" />
+            <div className="pro-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: '30px' }}>
+                <MetricCard icon={<Activity />} label="ACTIVE INSTANCES" value={metrics.activeStreams} color="indigo" variants={cardVariants} />
+                <MetricCard icon={<Eye />} label="TOTAL REACH" value={metrics.totalViews.toLocaleString()} color="emerald" variants={cardVariants} />
+                <MetricCard icon={<Cpu />} label="CPU LOAD" value={`${metrics.cpu}%`} color="rose" variants={cardVariants} />
+                <MetricCard icon={<Server />} label="RAM USAGE" value={`${metrics.memory}%`} color="amber" variants={cardVariants} />
+                <MetricCard icon={<HardDrive />} label="DISK FREE" value={metrics.health?.disk || 'PROBING'} color="cyan" variants={cardVariants} />
+                <MetricCard icon={<Zap />} label="FFMPEG ENGINE" value={metrics.health?.encoder || 'CPU'} color="violet" variants={cardVariants} />
             </div>
 
-            {/* CHARTS SECTION */}
-            <div className="dashboard-charts-row">
-                <div className="chart-box glass-premium">
-                    <div className="chart-header">
-                        <h4>📈 CPU LOAD HISTORY</h4>
-                        <span className="live-badge">LIVE</span>
+            {/* ANALYTICS ROW */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
+                <motion.div className="glass-card-pro" variants={cardVariants}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'white' }}><Cpu size={18} /> CPU REAL-TIME</h3>
+                        <span className="status-live" />
                     </div>
-                    <div className="chart-container-mini">
-                        <ResponsiveContainer width="100%" height={120}>
-                            <LineChart data={cpuHistory}>
-                                <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
-                                <Line type="monotone" dataKey="value" stroke="#818cf8" strokeWidth={3} dot={false} isAnimationActive={false} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-                <div className="chart-box glass-premium">
-                    <div className="chart-header">
-                        <h4>📊 MEMORY TREND</h4>
-                        <span className="live-badge">LIVE</span>
-                    </div>
-                    <div className="chart-container-mini">
-                        <ResponsiveContainer width="100%" height={120}>
-                            <AreaChart data={memoryHistory}>
+                    <div style={{ height: '180px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={cpuHistory}>
                                 <defs>
-                                    <linearGradient id="colorMem" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                                    <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
                                     </linearGradient>
                                 </defs>
                                 <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
-                                <Area type="monotone" dataKey="value" stroke="#f59e0b" fillOpacity={1} fill="url(#colorMem)" strokeWidth={2} isAnimationActive={false} />
+                                <Area type="monotone" dataKey="value" stroke="#f43f5e" strokeWidth={3} fillOpacity={1} fill="url(#colorCpu)" isAnimationActive={false} />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
-                </div>
+                </motion.div>
+
+                <motion.div className="glass-card-pro" variants={cardVariants}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'white' }}><Server size={18} /> RAM UTILIZATION</h3>
+                        <span className="status-live" />
+                    </div>
+                    <div style={{ height: '180px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={memoryHistory}>
+                                <defs>
+                                    <linearGradient id="colorMem" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
+                                <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorMem)" isAnimationActive={false} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
             </div>
 
-            {/* LIVE STREAMS TABLE */}
-            <div className="recent-activity-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', marginTop: '20px' }}>
-                <div className="recent-activity card glass-premium">
-                    <div className="activity-header-compact">
-                        <h3>📹 REAL-TIME STREAM METRICS</h3>
-                        <span className="metrics-count">{streams.length} INSTANCES</span>
+            {/* OPERATIONS TABLE */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+                <motion.div className="glass-card-pro" variants={cardVariants}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                        <h3 style={{ color: 'white' }}>📹 LIVE WORKERS</h3>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{streams.length} ACTIVE</span>
                     </div>
-                    <div className="compact-table-wrapper">
-                        <table className="compact-monitoring-table">
+                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                                <tr>
-                                    <th>STREAM ID</th>
+                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left', fontSize: '0.8rem', color: '#64748b' }}>
+                                    <th style={{ padding: '12px 10px' }}>ID</th>
                                     <th>CPU</th>
                                     <th>BITRATE</th>
                                     <th>STATUS</th>
-                                    <th>ACTION</th>
+                                    <th>COMMAND</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {streams.map(s => (
-                                    <tr key={s.id}>
-                                        <td className="st-id">{s.id}</td>
-                                        <td><div className="mini-progress"><div className="mini-fill" style={{ width: `${s.cpu}%` }}></div></div> {s.cpu}%</td>
-                                        <td className="st-br">{s.bitrate || '0'} kbps</td>
-                                        <td><span className={`status-pill-small ${s.status === 'OK' ? 'ok' : 'err'}`}>{s.status}</span></td>
-                                        <td>
-                                            <button className="btn-mini-restart" onClick={() => triggerRestart(s.id)}>🔄</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {streams.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', opacity: 0.5, padding: '20px' }}>No active streams.</td></tr>}
+                                <AnimatePresence>
+                                    {streams.map(s => (
+                                        <motion.tr 
+                                            key={s.id}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.9rem', color: 'white' }}
+                                        >
+                                            <td style={{ padding: '15px 10px', color: '#6366f1', fontWeight: 600 }}>{s.id}</td>
+                                            <td>
+                                                <div style={{ width: '60%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px' }}>
+                                                    <div style={{ width: `${s.cpu || 0}%`, height: '100%', background: '#6366f1', borderRadius: '10px' }} />
+                                                </div>
+                                            </td>
+                                            <td>{s.bitrate || 0} <small>kbps</small></td>
+                                            <td>
+                                                <span style={{ 
+                                                    padding: '4px 10px', 
+                                                    borderRadius: '6px', 
+                                                    fontSize: '0.7rem', 
+                                                    background: s.status === 'OK' || s.status === 'LIVE' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                                                    color: s.status === 'OK' || s.status === 'LIVE' ? '#10b981' : '#ef4444'
+                                                }}>
+                                                    {s.status}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button onClick={() => triggerRestart(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><RefreshCw size={16} /></button>
+                                            </td>
+                                        </motion.tr>
+                                    ))}
+                                </AnimatePresence>
+                                {streams.length === 0 && (
+                                    <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', opacity: 0.5, color: '#64748b' }}>No active workers detected. Start a stream from Management.</td></tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </motion.div>
 
-                <div className="recent-activity card glass-premium">
-                    <div className="activity-header-compact">
-                        <h3>📜 SYSTEM ACTIVITY LOG</h3>
-                        <span className="metrics-count">LATEST</span>
+                <motion.div className="glass-card-pro" variants={cardVariants}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                        <h3 style={{ color: 'white' }}>🛡️ SYSTEM SENTINEL</h3>
+                        <Shield size={16} color="#64748b" />
                     </div>
-                    <div className="activities-list">
-                        {activities.map((a, i) => (
-                            <div key={i} className="activity-row-minimal">
-                                <span className="a-time">{new Date(a.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                                <span className="a-user">{a.username || 'SYS'}</span>
-                                <span className="a-action">{a.action}</span>
-                                <span className="a-target">{a.target_id}</span>
+                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                        {activities && activities.length > 0 ? activities.map((a: any, i: number) => (
+                            <div key={i} style={{ display: 'flex', gap: '15px', padding: '12px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '0.85rem', color: 'white' }}>
+                                <span style={{ color: '#64748b' }}>{a.created_at ? new Date(a.created_at).toLocaleTimeString('id-id', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
+                                <span style={{ color: '#94a3b8' }}><b>{a.username || 'SYS'}:</b></span>
+                                <span>{a.action}</span>
                             </div>
-                        ))}
+                        )) : (
+                            <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>No recent system signals.</div>
+                        )}
                     </div>
-                </div>
+                </motion.div>
             </div>
-        </div>
+        </motion.div>
     );
 }
 
-const MetricCard = ({ icon, label, sub, value, color }: any) => (
-    <div className="metric-card glass-premium">
-        <div className={`m-icon ${color}`}>{icon}</div>
-        <div className="m-data">
-            <div className="m-val-group">
-                <span className="m-value">{value}</span>
-                <span className="m-unit">{label}</span>
+const MetricCard = ({ icon, label, value, color, variants }: any) => {
+    const bgColor = METRIC_COLORS[color] || METRIC_COLORS.indigo;
+    
+    return (
+        <motion.div className="glass-card-pro" variants={variants} whileHover={{ scale: 1.02 }}>
+            <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                <div style={{ 
+                    width: '45px', height: '45px', 
+                    borderRadius: '12px', 
+                    background: `${bgColor}15`, 
+                    color: bgColor,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    {React.cloneElement(icon, { size: 22 })}
+                </div>
+                <div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'white' }}>{value}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>{label}</div>
+                </div>
             </div>
-            <div className="m-label">{sub}</div>
-        </div>
+        </motion.div>
+    );
+};
+
+const HealthBadge = ({ label, ok }: { label: string, ok: boolean }) => (
+    <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '6px', 
+        background: 'rgba(30,41,59,0.5)', 
+        padding: '2px 8px', 
+        borderRadius: '6px',
+        fontSize: '0.65rem',
+        border: '1px solid rgba(255,255,255,0.05)'
+    }}>
+        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: ok ? '#10b981' : '#ef4444', boxShadow: ok ? '0 0 5px #10b981' : 'none' }} />
+        <span style={{ color: '#94a3b8', fontWeight: 700 }}>{label}</span>
     </div>
 );

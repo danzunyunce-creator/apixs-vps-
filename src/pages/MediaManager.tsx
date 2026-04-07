@@ -11,15 +11,18 @@ interface Video {
     duration?: number;
     file_size?: number;
     upload_date?: string;
+    description?: string;
+    tags?: string;
 }
 
 export default function MediaManager() {
     const [videos, setVideos] = useState<Video[]>([]);
     const [uploading, setUploading] = useState(false);
-    const [autoCompress, setAutoCompress] = useState(true);
+    const [autoCompress, setAutoCompress] = useState(false); // Default false for Phase 5 manual control
     const [compressingFile, setCompressingFile] = useState<File | null>(null);
     const [bulkPath, setBulkPath] = useState('');
     const [bulkLoading, setBulkLoading] = useState(false);
+    const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
     const loadVideos = useCallback(async () => {
         try {
@@ -38,7 +41,7 @@ export default function MediaManager() {
         if (!files || files.length === 0) return;
         
         if (autoCompress) {
-            setCompressingFile(files[0]); // For now, compress one at a time
+            setCompressingFile(files[0]);
             return;
         }
 
@@ -56,6 +59,24 @@ export default function MediaManager() {
             alert(`Gagal mengunggah: ${err.message}`);
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleOptimize = async (id: string) => {
+        try {
+            setProcessingIds(prev => new Set(prev).add(id));
+            await apiFetch(`/api/media/videos/${id}/process`, {
+                method: 'POST',
+                body: JSON.stringify({ targetRes: 720 })
+            });
+            alert('Optimasi dimulai di background. Cek log sistem untuk progress.');
+        } catch (err: any) {
+            alert('Gagal memulai optimasi: ' + err.message);
+            setProcessingIds(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
         }
     };
 
@@ -186,16 +207,30 @@ export default function MediaManager() {
                                 <p className="empty-msg">Belum ada video master. Silakan upload terlebih dahulu.</p>
                             ) : (
                                 videos.map((v) => (
-                                    <div key={v.id} className="queue-item" style={{ alignItems: 'flex-start' }}>
-                                        {/* THUMBNAIL PLACEHOLDER (or real thumb via APi static route if available) */}
-                                        <div className="q-num" style={{ background: '#3b82f6', color: 'white' }}>📼</div>
+                                    <div key={v.id} className="queue-item" style={{ alignItems: 'center' }}>
+                                        <div className="q-num" style={{ background: v.filepath.includes('_proc_') ? '#10b981' : '#3b82f6', color: 'white' }}>
+                                            {v.filepath.includes('_proc_') ? '✨' : '📼'}
+                                        </div>
                                         <div style={{ flex: 1 }}>
                                             <div className="q-title" style={{ fontWeight: 600, fontSize: '1rem', color: '#f8fafc' }}>{v.title}</div>
                                             <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-                                                Size: {formatSize(v.file_size)} • Type: MP4
+                                                {formatSize(v.file_size)} • {v.filepath.includes('_proc_') ? 'Optimized' : 'Raw'}
                                             </div>
                                         </div>
-                                        <button className="q-del" onClick={() => handleDelete(v.id)} title="Hapus Permanen">×</button>
+                                        <div className="item-actions" style={{ display: 'flex', gap: '8px' }}>
+                                            {!v.filepath.includes('_proc_') && (
+                                                <button 
+                                                    className={`btn-optimize ${processingIds.has(v.id) ? 'loading' : ''}`}
+                                                    onClick={() => handleOptimize(v.id)}
+                                                    disabled={processingIds.has(v.id)}
+                                                    title="Optimize for Live"
+                                                    style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer' }}
+                                                >
+                                                    {processingIds.has(v.id) ? '⌛' : '🪄 Optimize'}
+                                                </button>
+                                            )}
+                                            <button className="q-del" onClick={() => handleDelete(v.id)} title="Hapus Permanen">×</button>
+                                        </div>
                                     </div>
                                 ))
                             )}

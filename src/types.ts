@@ -35,17 +35,19 @@ export interface Playlist {
 export interface Schedule {
   id: string;
   name: string;
-  sourceType: 'playlist' | 'looping';
-  sourceName: string;
-  channel: string;
+  stream_id?: string;
+  sourceType?: 'playlist' | 'looping';
+  sourceName?: string;
+  channel?: string;
   stream_key: string;
   start_time: string;
   end_time: string;
-  status: 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'ERROR';
+  status: 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'ERROR' | string;
   playlist_path?: string;
   remaining?: number;
   rundown?: Video[];
 }
+
 
 export interface AutomationRule {
   id: string;
@@ -94,8 +96,26 @@ export interface FfmpegStats {
   bitrate: string;
 }
 
+export interface Node {
+  id: string;
+  name: string;
+  url: string;
+  load: number;
+  status: 'ONLINE' | 'OFFLINE' | string;
+  last_seen?: string;
+}
+
+export interface Stream {
+  id: string;
+  title: string;
+  status: string;
+  node?: string;
+  viewer_count?: number;
+}
+
 export interface LogEntry {
   time: string;
-  level: 'info' | 'warn' | 'error' | 'success';
+  type: 'info' | 'warn' | 'error' | 'success';
   msg: string;
 }
+

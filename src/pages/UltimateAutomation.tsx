@@ -4,7 +4,7 @@ import io from 'socket.io-client';
 import { BASE_URL } from '../api';
 import './UltimateAutomation.css';
 
-const SOCKET_URL = BASE_URL || window.location.origin.replace('5173', '3001');
+const SOCKET_URL = window.location.origin;
 
 export default function UltimateAutomation() {
     const [accounts, setAccounts] = useState<any[]>([]);
@@ -20,7 +20,7 @@ export default function UltimateAutomation() {
     useEffect(() => {
         loadData();
         
-        const socket = io(SOCKET_URL);
+        const socket = io(SOCKET_URL, { path: '/socket.io', transports: ['websocket', 'polling'] });
         socketRef.current = socket;
 
         socket.on('streamLog', (data: any) => {

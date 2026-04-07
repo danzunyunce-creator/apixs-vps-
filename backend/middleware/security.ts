@@ -2,7 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 
 const IP_LIMITS = new Map<string, { count: number, resetAt: number }>();
 const WINDOW_MS = 15 * 60 * 1000; // 15 Minutes
-const MAX_REQUESTS = 200; // 200 Requests per window
+const MAX_REQUESTS = 500; // 500 Requests per window
+
+// Whitelist for local development - never rate limit loopback
+const LOCAL_IPS = new Set(['::1', '127.0.0.1', '::ffff:127.0.0.1', 'localhost']);
 
 /**
  * Unicorn Security Headers (Manual Helmet)
@@ -21,6 +24,10 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
  */
 export const rateLimiter = (req: Request, res: Response, next: NextFunction) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    
+    // Whitelist localhost - never block local development or VPS loopback
+    if (LOCAL_IPS.has(ip)) return next();
+    
     const now = Date.now();
     
     let limitData = IP_LIMITS.get(ip);
