@@ -125,15 +125,15 @@ router.post('/videos/:id/process', authMiddleware, async (req: AuthRequest, res)
     const { id } = req.params;
     const { targetRes } = req.body; // e.g. 720, 1080
     
-    dbLayer.db.get(`SELECT id, filepath, title FROM videos WHERE id = ?`, [id], async (err, row: any) => {
+    dbLayer.db.get(`SELECT id, filepath, title FROM videos WHERE TRIM(id) = TRIM(?)`, [id], async (err, row: any) => {
         if (err) return res.status(500).json({ error: 'DB Error: ' + err.message });
         if (!row) {
             // Diagnostic: Log what actually exists in the DB
-            dbLayer.db.all('SELECT id FROM videos LIMIT 10', (dErr, rows) => {
-                const existing = rows ? rows.map(r => r.id).join(', ') : 'none';
-                console.error(`[Process Error] Video ${id} not found. Existing IDs: ${existing}`);
+            dbLayer.db.all('SELECT id FROM videos ORDER BY upload_date DESC LIMIT 10', (dErr, rows) => {
+                const existing = rows ? rows.map(r => `"${r.id}"`).join(', ') : 'none';
+                console.error(`[Process Error] Video "${id}" not found. Recent IDs: ${existing}`);
             });
-            return res.status(404).json({ error: 'Video not found (ID: ' + id + '). Pastikan file sudah terindeks.' });
+            return res.status(404).json({ error: `Video ID "${id}" tidak ditemukan. Silakan upload ulang atau coba refresh daftar video.` });
         }
         
         try {

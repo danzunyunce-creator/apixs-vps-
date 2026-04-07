@@ -28,7 +28,7 @@ export const createScheduleRouter = (streamManager: StreamManager, io: Server) =
         dbLayer.db.run(
             `INSERT INTO schedules (id, name, start_time, end_time, stream_id, status, is_recurring, stream_key, playlist_path, user_id, youtube_account_id) 
              VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?)`,
-            [id, name, start, end, stream_id, 'SCHEDULED', is_recurring ? 1 : 0, stream_key || '', playlist_path || '', userId, youtube_account_id || null],
+            [id, name, start, end, stream_id, is_recurring ? 1 : 0, stream_key || '', playlist_path || '', userId, youtube_account_id || null],
             function (err) {
                 if (err) return res.status(500).json({ error: err.message });
                 res.json({ id, message: 'Jadwal berhasil dibuat!', status: 'SCHEDULED' });
