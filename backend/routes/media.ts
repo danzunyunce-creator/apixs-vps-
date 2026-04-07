@@ -126,7 +126,8 @@ router.post('/videos/:id/process', authMiddleware, async (req: AuthRequest, res)
     const { targetRes } = req.body; // e.g. 720, 1080
     
     dbLayer.db.get(`SELECT id, filepath, title FROM videos WHERE id = ?`, [id], async (err, row: any) => {
-        if (!row) return res.status(404).json({ error: 'Video not found' });
+        if (err) return res.status(500).json({ error: 'DB Error: ' + err.message });
+        if (!row) return res.status(404).json({ error: 'Video not found (ID: ' + id + ')' });
         
         try {
             const input = row.filepath;
