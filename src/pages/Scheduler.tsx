@@ -19,6 +19,9 @@ interface Schedule {
     youtube_account_id?: string;
     is_recurring?: number;
     platform?: string;
+    privacy?: string;
+    category?: string;
+    is_upload?: number;
 }
 
 export default function Scheduler() {
@@ -38,7 +41,11 @@ export default function Scheduler() {
         stream_key: '',
         playlist_path: '',
         youtube_account_id: '',
-        is_recurring: false
+        is_recurring: false,
+        privacy: 'public',
+        category: 'Entertainment',
+        is_upload: true,
+        start: new Date(Date.now() + 3600000).toISOString().slice(0, 16)
     });
 
     const loadData = useCallback(async () => {
@@ -68,7 +75,8 @@ export default function Scheduler() {
         try {
             const payload = {
                 ...formData,
-                is_recurring: formData.is_recurring ? 1 : 0
+                is_recurring: formData.is_recurring ? 1 : 0,
+                is_upload: formData.is_upload ? 1 : 0
             };
             if (editingId) {
                 await apiFetch(`/api/schedules/${editingId}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -105,7 +113,10 @@ export default function Scheduler() {
             youtube_account_id: s.youtube_account_id || '',
             playlist_path: s.playlist_path || '',
             stream_key: s.stream_key || '',
-            is_recurring: !!s.is_recurring
+            is_recurring: !!s.is_recurring,
+            privacy: s.privacy || 'public',
+            category: s.category || 'Entertainment',
+            is_upload: !!s.is_upload
         });
         setEditingId(null);
         setShowForm(true);
@@ -164,41 +175,98 @@ export default function Scheduler() {
                         >
                             <h3>{editingId ? 'Edit Manifest' : 'New Broadcast Manifest'}</h3>
                             <form onSubmit={handleSave} style={{ marginTop: '20px' }}>
-                                <div className="form-group" style={{ marginBottom: '15px' }}>
-                                    <label style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', marginBottom: '5px' }}>EVENT NAME</label>
+                                <div className="form-group-premium">
+                                    <label className="premium-label">JUDUL VIDEO</label>
                                     <input 
-                                        className="pro-input" 
+                                        className="premium-input" 
                                         value={formData.name} 
                                         onChange={e => setFormData({...formData, name: e.target.value})}
-                                        placeholder="Enter stream title..." 
+                                        placeholder="Looped Video" 
                                         required 
                                     />
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                    <div>
-                                        <label style={{ fontSize: '0.8rem', color: '#64748b' }}>START TIME</label>
-                                        <input type="datetime-local" className="pro-input" value={formData.start} onChange={e => setFormData({...formData, start: e.target.value})} required />
-                                    </div>
-                                    <div>
-                                        <label style={{ fontSize: '0.8rem', color: '#64748b' }}>END TIME (OPT)</label>
-                                        <input type="datetime-local" className="pro-input" value={formData.end} onChange={e => setFormData({...formData, end: e.target.value})} />
-                                    </div>
-                                </div>
-                                <div className="form-group" style={{ marginBottom: '15px' }}>
-                                    <label style={{ fontSize: '0.8rem', color: '#64748b' }}>TARGET CHANNEL</label>
-                                    <select className="pro-input" value={formData.youtube_account_id} onChange={e => setFormData({...formData, youtube_account_id: e.target.value})}>
-                                        <option value="">Manual Entry / Restream</option>
-                                        {channels.map(ch => <option key={ch.id} value={ch.id}>YouTube: {ch.channel_name}</option>)}
+
+                                <div className="form-group-premium">
+                                    <label className="premium-label">YOUTUBE CHANNEL *</label>
+                                    <select className="premium-input" value={formData.youtube_account_id} onChange={e => setFormData({...formData, youtube_account_id: e.target.value})} required>
+                                        <option value="">Pilih channel...</option>
+                                        {channels.map(ch => <option key={ch.id} value={ch.id}>{ch.channel_name}</option>)}
                                     </select>
                                 </div>
-                                <div className="form-group" style={{ marginBottom: '15px' }}>
-                                    <label style={{ fontSize: '0.8rem', color: '#64748b' }}>MASTER VIDEO</label>
-                                    <select className="pro-input" value={formData.playlist_path} onChange={e => setFormData({...formData, playlist_path: e.target.value})} required>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                    <div className="form-group-premium">
+                                        <label className="premium-label">PRIVACY</label>
+                                        <select className="premium-input" value={formData.privacy} onChange={e => setFormData({...formData, privacy: e.target.value})}>
+                                            <option value="public">Public</option>
+                                            <option value="private">Private</option>
+                                            <option value="unlisted">Unlisted</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group-premium">
+                                        <label className="premium-label">CATEGORY</label>
+                                        <select className="premium-input" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                                            <option value="Entertainment">Entertainment</option>
+                                            <option value="Music">Music</option>
+                                            <option value="Gaming">Gaming</option>
+                                            <option value="Education">Education</option>
+                                            <option value="News">News</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="premium-switch-group">
+                                    <div className="switch-label-row">
+                                        <Calendar size={18} color="#6366f1" />
+                                        <span>Jadwalkan Upload</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => setFormData({...formData, is_upload: !formData.is_upload})}
+                                        style={{ 
+                                            width: '50px', height: '26px', background: formData.is_upload ? '#22c55e' : '#334155', 
+                                            borderRadius: '20px', position: 'relative', cursor: 'pointer', transition: '0.3s' 
+                                        }}
+                                    >
+                                        <motion.div 
+                                            animate={{ x: formData.is_upload ? 26 : 4 }}
+                                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                            style={{ width: '18px', height: '18px', background: 'white', borderRadius: '50%', position: 'absolute', top: '4px' }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {formData.is_upload && (
+                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} style={{ overflow: 'hidden', marginTop: '15px' }}>
+                                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div style={{ marginBottom: '15px' }}>
+                                                <label className="premium-label">TANGGAL</label>
+                                                <input type="date" className="premium-input" value={formData.start?.split('T')[0]} onChange={e => setFormData({...formData, start: `${e.target.value}T${formData.start?.split('T')[1] || '12:00'}`})} />
+                                            </div>
+                                            <div>
+                                                <label className="premium-label">JAM (WIB - JAKARTA)</label>
+                                                <input type="time" className="premium-input" value={formData.start?.split('T')[1]} onChange={e => setFormData({...formData, start: `${formData.start?.split('T')[0]}T${e.target.value}`})} />
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                <div className="policy-warning-note">
+                                    <div className="warning-icon"><Clock size={18} /></div>
+                                    <div className="warning-text">
+                                        Privacy otomatis diset ke <strong>Private</strong> (syarat YouTube). Video akan dipublish otomatis pada waktu yang dijadwalkan.
+                                        <div className="warning-footer">Minimal 30 menit dari sekarang. Timezone: WIB (UTC+7).</div>
+                                    </div>
+                                </div>
+
+                                <div className="form-group-premium" style={{ marginTop: '20px' }}>
+                                    <label className="premium-label">MASTER VIDEO</label>
+                                    <select className="premium-input" value={formData.playlist_path} onChange={e => setFormData({...formData, playlist_path: e.target.value})} required>
                                         <option value="">Select source video...</option>
                                         {videos.map(v => <option key={v.id} value={v.filepath}>{v.title}</option>)}
                                     </select>
                                 </div>
-                                <button type="submit" disabled={loading} className="neon-btn" style={{ width: '100%', justifyContent: 'center' }}>
+
+                                <button type="submit" disabled={loading} className="neon-btn" style={{ width: '100%', justifyContent: 'center', marginTop: '10px' }}>
                                     {loading ? 'DEPLOYING...' : 'SAVE SCHEDULE'}
                                 </button>
                             </form>

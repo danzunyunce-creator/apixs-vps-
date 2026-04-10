@@ -26,9 +26,9 @@ export const createScheduleRouter = (streamManager: StreamManager, io: Server) =
         const id = 'sched-' + Date.now();
         
         dbLayer.db.run(
-            `INSERT INTO schedules (id, name, start_time, end_time, stream_id, status, is_recurring, stream_key, playlist_path, user_id, youtube_account_id) 
-             VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?)`,
-            [id, name, start, end, stream_id, is_recurring ? 1 : 0, stream_key || '', playlist_path || '', userId, youtube_account_id || null],
+            `INSERT INTO schedules (id, name, start_time, end_time, stream_id, status, is_recurring, stream_key, playlist_path, user_id, youtube_account_id, privacy, category, is_upload) 
+             VALUES (?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, name, start, end, stream_id, is_recurring ? 1 : 0, stream_key || '', playlist_path || '', userId, youtube_account_id || null, req.body.privacy || 'public', req.body.category || 'Entertainment', req.body.is_upload ? 1 : 0],
             function (err) {
                 if (err) return res.status(500).json({ error: err.message });
                 res.json({ id, message: 'Jadwal berhasil dibuat!', status: 'SCHEDULED' });
@@ -42,8 +42,8 @@ export const createScheduleRouter = (streamManager: StreamManager, io: Server) =
         const { id } = req.params;
 
         dbLayer.db.run(
-            `UPDATE schedules SET name = ?, start_time = ?, end_time = ?, stream_id = ?, is_recurring = ?, stream_key = ?, playlist_path = ?, youtube_account_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-            [name, start, end, stream_id, is_recurring ? 1 : 0, stream_key, playlist_path, youtube_account_id || null, id],
+            `UPDATE schedules SET name = ?, start_time = ?, end_time = ?, stream_id = ?, is_recurring = ?, stream_key = ?, playlist_path = ?, youtube_account_id = ?, privacy = ?, category = ?, is_upload = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [name, start, end, stream_id, is_recurring ? 1 : 0, stream_key, playlist_path, youtube_account_id || null, req.body.privacy, req.body.category, req.body.is_upload ? 1 : 0, id],
             function (err) {
                 if (err) return res.status(500).json({ error: err.message });
                 res.json({ message: 'Schedule updated' });

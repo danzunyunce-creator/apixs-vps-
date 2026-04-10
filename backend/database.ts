@@ -205,6 +205,9 @@ async function createTables(): Promise<void> {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             is_recurring INTEGER DEFAULT 0,
+            privacy TEXT DEFAULT 'public',
+            category TEXT DEFAULT 'Entertainment',
+            is_upload INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )`,
         `CREATE TABLE IF NOT EXISTS stream_sessions (
@@ -343,6 +346,9 @@ export async function initializeDatabase(): Promise<void> {
   await safeAddColumn('streams', 'youtube_broadcast_id', 'TEXT');
   await safeAddColumn('streams', 'youtube_job_status', "TEXT DEFAULT 'pending'");
   await safeAddColumn('streams', 'is_queued', 'INTEGER DEFAULT 0');
+  await safeAddColumn('schedules', 'privacy', "TEXT DEFAULT 'public'");
+  await safeAddColumn('schedules', 'category', "TEXT DEFAULT 'Entertainment'");
+  await safeAddColumn('schedules', 'is_upload', 'INTEGER DEFAULT 0');
   
   // Seed Admin Accounts
   const hash1 = bcrypt.hashSync('liveapixs', 10);
