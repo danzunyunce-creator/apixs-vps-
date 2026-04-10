@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Stream, Node } from '../../types';
 import { ChannelSummaryBadge } from './ChannelSummaryBadge';
 
@@ -24,6 +25,7 @@ export const StreamList: React.FC<StreamListProps> = ({
     onSelectAll
 }) => {
     const isAllSelected = streams.length > 0 && selectedStreams.length === streams.length;
+    const navigate = useNavigate();
 
     return (
         <section className="streams-data-table-container">
@@ -67,7 +69,10 @@ export const StreamList: React.FC<StreamListProps> = ({
                                         <div className="table-actions">
                                             {onEdit && <button className="btn-table btn-redo" onClick={() => onEdit(s)}>Edit</button>}
                                             {isActive ? (
-                                                <button className="btn-table btn-stop" onClick={() => onAction(s.id, 'stop')}>Stop</button>
+                                                <>
+                                                    <button className="btn-table btn-stop" onClick={() => onAction(s.id, 'stop')}>Stop</button>
+                                                    <button className="btn-table btn-redo" style={{background: '#6366f1'}} onClick={() => navigate(`/live-chat/${s.id}`)}>Chat</button>
+                                                </>
                                             ) : (
                                                 <button className="btn-table btn-start" onClick={() => onAction(s.id, 'start')}>Start</button>
                                             )}

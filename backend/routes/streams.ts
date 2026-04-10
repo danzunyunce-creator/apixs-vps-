@@ -6,6 +6,7 @@ import * as dbLayer from '../database';
 import { authMiddleware, AuthRequest, adminOnly } from '../middleware/auth';
 import { StreamManager } from '../streamManager';
 import { Server } from 'socket.io';
+import * as ytApi from '../youtubeApi';
 import config from '../config';
 
 const router = express.Router();
@@ -161,6 +162,108 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
         } catch (err: any) {
             console.error('[Dashboard Error]:', err);
             res.json(result); // Return skeleton instead of 500 to keep UI alive
+        }
+    });
+
+    // 4.1 LIVE CHAT (YouTube)
+    router.get('/live-chat/:id', authMiddleware, async (req: AuthRequest, res) => {
+        const streamId = req.params.id;
+        try {
+            dbLayer.db.get(`SELECT youtube_account_id FROM streams WHERE id = ?`, [streamId], async (err, stream: any) => {
+                if (err || !stream || !stream.youtube_account_id) {
+                    return res.status(404).json({ error: 'Stream not found or not a YouTube stream' });
+                }
+
+                try {
+                    const messages = await ytApi.execute(async (youtube) => {
+                        // 1. Get active broadcast to find liveChatId
+                        const broadcasts = await youtube.liveBroadcasts.list({
+                            part: ['snippet', 'status'],
+                            broadcastStatus: 'active',
+                            broadcastType: 'all'
+                        });
+
+                        const activeItem = broadcasts.data.items?.[0];
+                        const liveChatId = activeItem?.snippet?.liveChatId;
+
+                        if (!liveChatId) throw new Error('Live Chat ID not found. Is the stream live?');
+
+                        // 2. Get messages
+                        const chatRes = await youtube.liveChatMessages.list({
+                            liveChatId: liveChatId,
+                            part: ['snippet', 'authorDetails'],
+                            maxResults: 50
+                        });
+
+                        return {
+                            liveChatId,
+                            messages: chatRes.data.items?.map(m => ({
+                                id: m.id,
+                                author: m.authorDetails?.displayName,
+                                profile: m.authorDetails?.profileImageUrl,
+                                message: m.snippet?.displayMessage,
+                                isChatOwner: m.authorDetails?.isChatOwner,
+                                publishedAt: m.snippet?.publishedAt
+                            })) || []
+                        };
+                    }, stream.youtube_account_id);
+
+                    res.json(messages);
+                } catch (apiErr: any) {
+                    res.status(500).json({ error: apiErr.message });
+                }
+            });
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    router.post('/live-chat/:id/message', authMiddleware, async (req: AuthRequest, res) => {
+        const streamId = req.params.id;
+        const { message, liveChatId } = req.body;
+
+        if (!message) return res.status(400).json({ error: 'Message context missing' });
+
+        try {
+            dbLayer.db.get(`SELECT youtube_account_id FROM streams WHERE id = ?`, [streamId], async (err, stream: any) => {
+                if (!stream?.youtube_account_id) return res.status(404).json({ error: 'OAuth context missing' });
+
+                try {
+                    await ytApi.execute(async (youtube) => {
+                        let targetChatId = liveChatId;
+                        
+                        // If no liveChatId provided, look it up (failsafe)
+                        if (!targetChatId) {
+                            const broadcasts = await youtube.liveBroadcasts.list({
+                                part: ['snippet'],
+                                broadcastStatus: 'active'
+                            });
+                            targetChatId = broadcasts.data.items?.[0]?.snippet?.liveChatId;
+                        }
+
+                        if (!targetChatId) throw new Error('Could not resolve Live Chat ID');
+
+                        await youtube.liveChatMessages.insert({
+                            part: ['snippet'],
+                            requestBody: {
+                                snippet: {
+                                    liveChatId: targetChatId,
+                                    type: 'textMessageEvent',
+                                    textMessageDetails: {
+                                        messageText: message
+                                    }
+                                }
+                            }
+                        });
+                    }, stream.youtube_account_id);
+
+                    res.json({ success: true });
+                } catch (apiErr: any) {
+                    res.status(500).json({ error: apiErr.message });
+                }
+            });
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
         }
     });
 
