@@ -22,7 +22,7 @@
     -webkit-text-fill-color: transparent;
 }
 
-.pipeline-header p { color: #94a3b8; font-size: 0.9rem; }
+.pipeline-header p { color: var(--text-dim); font-size: 0.9rem; }
 
 /* STEPPER */
 .stepper-box {
@@ -50,7 +50,7 @@
     align-items: center;
     justify-content: center;
     font-weight: 800;
-    color: #475569;
+    color: var(--text-dim);
     z-index: 2;
     transition: all 0.3s;
 }
@@ -69,7 +69,7 @@
 }
 
 .step-info { display: flex; align-items: center; gap: 8px; }
-.step-title { font-weight: 700; color: #475569; }
+.step-title { font-weight: 700; color: var(--text-dim); }
 .step-item.active .step-title { color: #f8fafc; }
 .step-item.done .step-title { color: #22c55e; }
 
@@ -125,7 +125,7 @@
 
 .up-icon { font-size: 1.8rem; margin-bottom: 8px; display: block; }
 .upload-zone label { display: block; cursor: pointer; font-size: 0.85rem; }
-.upload-zone small { color: #475569; display: block; margin-top: 6px; font-size: 0.75rem; }
+.upload-zone small { color: var(--text-dim); display: block; margin-top: 6px; font-size: 0.75rem; }
 
 .upload-loader-bar {
     position: absolute;
@@ -163,7 +163,7 @@
 
 .btn-reset {
     background: transparent;
-    color: #475569;
+    color: var(--text-dim);
     border: none;
     font-size: 0.9rem;
     margin-top: 12px;
@@ -208,7 +208,7 @@
 .log-entry.error { border-color: #ef4444; color: #f87171; }
 .l-time { color: #475569; margin-right: 6px; }
 
-.empty-msg { text-align: center; color: #475569; padding: 40px 0; font-style: italic; }
+.empty-msg { text-align: center; color: var(--text-dim); padding: 40px 0; font-style: italic; }
 
 /* COMPRESSOR STYLES */
 .compress-toggle {
@@ -374,7 +374,7 @@ input:checked + .slider:before { transform: translateX(20px); }
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
-.bulk-input::placeholder { color: #475569; }
+.bulk-input::placeholder { color: var(--text-dim); }
 
 .btn-bulk {
     background: linear-gradient(135deg, #6366f1, #4f46e5);

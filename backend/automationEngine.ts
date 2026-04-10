@@ -248,6 +248,9 @@ export class AutomationEngine {
                 const nowStr = new Date().toISOString();
 
                 for (let schedule of rows) {
+                    // --- 🛡️ DOUBLE-START GUARD ---
+                    if (schedule.status !== 'SCHEDULED') continue;
+
                     const startTime = new Date(schedule.start_time).getTime();
                     if (startTime <= now) {
                         const startMsg = `[Auto Start Live] Waktu jadwal <b>${schedule.name}</b> telah tiba. Menyiapkan worker...`;

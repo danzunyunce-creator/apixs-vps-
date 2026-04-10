@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as dbLayer from './database';
+import { CryptoProvider } from './utils/cryptoProvider';
 
 export class TelegramService {
     private async getTelegramConfig(): Promise<{ token: string; chatId: string }> {
@@ -8,10 +9,14 @@ export class TelegramService {
                 if (err) return reject(err);
                 const cfg: any = {};
                 rows.forEach(r => { cfg[r.key] = r.value; });
-                if (!cfg.telegram_bot_token || !cfg.telegram_chat_id) {
-                    return reject(new Error('Telegram credentials not configured.'));
+                
+                // Decrypt sensitive token
+                const token = CryptoProvider.decrypt(cfg.telegram_bot_token);
+                
+                if (!token || !cfg.telegram_chat_id) {
+                    return reject(new Error('Telegram credentials not configured or corrupted.'));
                 }
-                resolve({ token: cfg.telegram_bot_token, chatId: cfg.telegram_chat_id });
+                resolve({ token, chatId: cfg.telegram_chat_id });
             });
         });
     }

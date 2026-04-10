@@ -1,0 +1,39 @@
+/* d:\apixs live apps\src\pages\AuditTrail.css */
+
+.audit-trail table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.audit-trail th {
+    background-color: var(--bg-card);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.audit-trail td {
+    vertical-align: middle;
+}
+
+.audit-trail tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.audit-trail tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.glass-input {
+    background: rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.glass-input:focus-within {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 2px rgba(9, 219, 137, 0.1);
+}

@@ -111,6 +111,20 @@ export interface Stream {
   status: string;
   node?: string;
   viewer_count?: number;
+  platform?: string;
+  rtmp_url?: string;
+  stream_key?: string;
+  playlist_path?: string;
+  description?: string;
+  tags?: string;
+  auto_restart?: boolean;
+  ai_tone?: string;
+  destinations?: any[];
+  privacy_status?: string;
+  youtube_broadcast_id?: string;
+  youtube_job_status?: string;
+  is_queued?: boolean | number;
+  created_at?: string;
 }
 
 export interface LogEntry {

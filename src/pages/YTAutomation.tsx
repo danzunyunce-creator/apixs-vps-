@@ -192,7 +192,7 @@ export default function YTAutomation() {
         <div className="yt-auto-container">
             <div className="yt-auto-header">
                 <div>
-                    <h1>🧠 Master Control Center</h1>
+                    <h1>🧠 YouTube Automation</h1>
                     <p className="subtitle">Pusat komando otomatisasi AI: Pantau dan kendalikan "otak" siaran Anda.</p>
                 </div>
                 <div className="engine-status-badge">

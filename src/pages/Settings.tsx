@@ -103,7 +103,7 @@ export default function Settings() {
                             whileHover={{ x: 5 }}
                             style={{ 
                                 display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', 
-                                borderRadius: '12px', cursor: 'pointer', color: activeTab === tab.id ? 'white' : '#64748b',
+                                borderRadius: '12px', cursor: 'pointer', color: activeTab === tab.id ? 'white' : 'var(--text-dim)',
                                 background: activeTab === tab.id ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
                                 transition: '0.2s'
                             }}
@@ -113,7 +113,7 @@ export default function Settings() {
                         </motion.div>
                     ))}
                     
-                    <div style={{ marginTop: '20px', padding: '15px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '0.7rem', color: '#475569' }}>
+                    <div style={{ marginTop: '20px', padding: '15px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '0.7rem', color: 'var(--text-dim)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                             <span>CORE VERSION</span>
                             <span style={{ color: '#6366f1' }}>2.5.0-ELITE</span>
@@ -155,7 +155,7 @@ export default function Settings() {
                             )}
 
                             {activeTab === 'youtube' && (
-                                <Section title="YouTube Credentials" sub="OAuth 2.0 and API keys for broadcast management.">
+                                <Section title="YouTube Credentials" sub="Primary and Backup OAuth 2.0 API keys for automatic failover.">
                                     <div className="field">
                                         <label>Primary Data API Key</label>
                                         <div style={{ position: 'relative' }}>
@@ -170,14 +170,38 @@ export default function Settings() {
                                             </button>
                                         </div>
                                     </div>
+                                    <div className="field" style={{ marginTop: '15px' }}>
+                                        <label>Backup Data API Key</label>
+                                        <div style={{ position: 'relative' }}>
+                                            <input 
+                                                className="pro-input" 
+                                                type={showKeys['yt_api_2'] ? 'text' : 'password'} 
+                                                value={config.yt_api_key_2 || ''} 
+                                                onChange={e => setConfig({...config, yt_api_key_2: e.target.value})} 
+                                            />
+                                            <button onClick={() => toggleKey('yt_api_2')} style={iconBtnStyle}>
+                                                {showKeys['yt_api_2'] ? <EyeOff size={16}/> : <Eye size={16}/>}
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '15px' }}>
                                         <div className="field">
-                                            <label>Client ID</label>
+                                            <label>Primary Client ID</label>
                                             <input className="pro-input" type="text" value={config.yt_client_id || ''} onChange={e => setConfig({...config, yt_client_id: e.target.value})} />
                                         </div>
                                         <div className="field">
-                                            <label>Client Secret</label>
+                                            <label>Primary Client Secret</label>
                                             <input className="pro-input" type="password" value={config.yt_client_secret || ''} onChange={e => setConfig({...config, yt_client_secret: e.target.value})} />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '15px' }}>
+                                        <div className="field">
+                                            <label>Backup Client ID</label>
+                                            <input className="pro-input" type="text" value={config.yt_client_id_2 || ''} onChange={e => setConfig({...config, yt_client_id_2: e.target.value})} />
+                                        </div>
+                                        <div className="field">
+                                            <label>Backup Client Secret</label>
+                                            <input className="pro-input" type="password" value={config.yt_client_secret_2 || ''} onChange={e => setConfig({...config, yt_client_secret_2: e.target.value})} />
                                         </div>
                                     </div>
                                 </Section>
@@ -242,7 +266,7 @@ export default function Settings() {
                     display: block;
                     font-size: 0.75rem;
                     font-weight: 700;
-                    color: #64748b;
+                    color: var(--text-dim);
                     margin-bottom: 8px;
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
@@ -255,7 +279,7 @@ export default function Settings() {
 const Section = ({ title, sub, children }: any) => (
     <div>
         <h3 style={{ marginBottom: '5px' }}>{title}</h3>
-        <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '30px' }}>{sub}</p>
+        <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '30px' }}>{sub}</p>
         {children}
     </div>
 );
@@ -266,6 +290,6 @@ const iconBtnStyle: React.CSSProperties = {
     top: '10px',
     background: 'none',
     border: 'none',
-    color: '#475569',
+    color: 'var(--text-dim)',
     cursor: 'pointer'
 };

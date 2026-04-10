@@ -46,12 +46,13 @@ export class StreamManager {
     private LOG_THROTTLE_MS = 500;
     private autoEngine: any = null;
     private availableEncoder: string = 'libx264'; 
-    private lastCpuStats: { idle: number, total: number } | null = null;
+    private lastCpuStats: { idle: number, total: number, prevIdle?: number, prevTotal?: number } | null = null;
 
     constructor(io: Server) {
         this.io = io;
         this.activeStreams = new Map();
         this.startMetricsBroadcast();
+        this.startZombieWatchdog(); // Lifecycle management
         this.probeEncoders();
         this.setupExitHandlers();
     }
@@ -91,6 +92,21 @@ export class StreamManager {
         if (this.activeStreams.has(id)) {
             console.log(`Stream ${id} is already running.`);
             return;
+        }
+
+        // --- 🚀 PERFORMANCE GUARD: CPU THRESHOLD ---
+        if (this.lastCpuStats) {
+            const idleDiff = this.lastCpuStats.idle - (this.lastCpuStats.prevIdle || 0);
+            const totalDiff = this.lastCpuStats.total - (this.lastCpuStats.prevTotal || 0);
+            const usage = totalDiff > 0 ? (100 - (100 * idleDiff / totalDiff)) : 0;
+            
+            if (usage > 90) {
+                const errMsg = `⚠️ [Performance] Gagal: Beban CPU VPS sangat tinggi (${Math.floor(usage)}%). Harap tunggu sebentar atau matikan stream lain.`;
+                this.emitLog(id, 'error', errMsg);
+                dbLayer.saveSystemLog(id, 'error', errMsg).catch(() => {});
+                await dbLayer.updateStreamStatus(id, 'ERROR');
+                return;
+            }
         }
 
         console.log(`[StreamManager] Starting Stream for ID: ${id}`);
@@ -473,6 +489,29 @@ export class StreamManager {
         this.io.emit('streamLog', logObj);
     }
 
+    /**
+     * ZOMBIE WATCHDOG: Reaps orphaned FFmpeg processes every 60 seconds.
+     * Prevents resource leakage if the server restarts or crashes ungracefully.
+     */
+    private startZombieWatchdog() {
+        setInterval(() => {
+            const platform = os.platform();
+            const cmd = platform === 'win32' ? 'tasklist' : 'ps aux | grep ffmpeg';
+            
+            exec(cmd, (err, stdout) => {
+                if (err) return;
+                
+                // Simplified strategy: Kill FFmpeg if activeStreams is empty 
+                // (More advanced logic would involve checking PIDs)
+                if (this.activeStreams.size === 0 && stdout.toLowerCase().includes('ffmpeg')) {
+                    console.warn('⚠️ [Watchdog] Detected stray FFmpeg processes while no streams are active. Reaping...');
+                    const killCmd = platform === 'win32' ? 'taskkill /F /IM ffmpeg.exe' : 'pkill -9 ffmpeg';
+                    exec(killCmd);
+                }
+            });
+        }, 60000); // Check every minute
+    }
+
     private startMetricsBroadcast() {
         setInterval(async () => {
             if (this.io.sockets.sockets.size === 0) return; // Only calculate if someone is watching
@@ -497,6 +536,10 @@ export class StreamManager {
                     const idleDiff = idle - this.lastCpuStats.idle;
                     const totalDiff = total - this.lastCpuStats.total;
                     cpuUsage = totalDiff > 0 ? Math.floor(100 - (100 * idleDiff / totalDiff)) : 0;
+                    
+                    // Store deltas for startStream check
+                    (this.lastCpuStats as any).prevIdle = this.lastCpuStats.idle;
+                    (this.lastCpuStats as any).prevTotal = this.lastCpuStats.total;
                 }
                 this.lastCpuStats = { idle, total };
                 

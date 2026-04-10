@@ -20,7 +20,7 @@ router.get('/', authMiddleware, adminOnly, (req, res) => {
     dbLayer.db.all(`SELECT * FROM app_config ORDER BY key ASC`, [], (err, rows: any[]) => {
         if (err) return res.status(500).json({ error: err.message });
         const cfg: any = {};
-        const sensitiveKeys = ['yt_client_id', 'yt_client_secret', 'openai_api_key'];
+        const sensitiveKeys = ['yt_client_id', 'yt_client_secret', 'yt_client_id_2', 'yt_client_secret_2', 'openai_api_key', 'telegram_bot_token', 'yt_api_key_1', 'yt_api_key_2'];
         rows.forEach(r => { 
             if (sensitiveKeys.includes(r.key) && r.value) {
                 // Return masked value to UI for security
@@ -38,7 +38,7 @@ router.put('/', authMiddleware, adminOnly, async (req, res) => {
     const configData = req.body;
     try {
         const keys = Object.keys(configData);
-        const sensitiveKeys = ['yt_client_id', 'yt_client_secret', 'openai_api_key'];
+        const sensitiveKeys = ['yt_client_id', 'yt_client_secret', 'yt_client_id_2', 'yt_client_secret_2', 'openai_api_key', 'telegram_bot_token', 'yt_api_key_1', 'yt_api_key_2'];
         
         for (const key of keys) {
             let val = configData[key];

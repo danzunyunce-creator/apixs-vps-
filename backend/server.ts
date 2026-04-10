@@ -20,6 +20,7 @@ import { createScheduleRouter } from './routes/schedules';
 import { createAutomationRouter } from './routes/automation';
 import settingsRoutes from './routes/settings';
 import nodesRoutes from './routes/nodes'; // Added import for nodesRoutes
+import systemRoutes from './routes/system';
 import { securityHeaders, rateLimiter } from './middleware/security';
 
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/streams', createStreamRouter(streamManager, io));
 app.use('/api/schedules', createScheduleRouter(streamManager, io));
 app.use('/api/automation', createAutomationRouter(autoEngine));
 app.use('/api/nodes', nodesRoutes);
+app.use('/api/system', systemRoutes);
 app.use('/api/config', settingsRoutes);
 
 // ── Serve Frontend (dist/ folder) ──

@@ -13,6 +13,7 @@ import {
 import toast, { Toaster } from 'react-hot-toast';
 import io from 'socket.io-client';
 import { BASE_URL } from '../api';
+import { NodeGrid } from '../components/stream-management/NodeGrid';
 
 // Connect via Vite proxy (same origin) — avoids CORS & direct port issues
 const SOCKET_URL = window.location.origin;
@@ -45,6 +46,7 @@ export default function Dashboard() {
         health: { ffmpeg: '...', database: '...', disk: '...' } as any 
     });
     const [streams, setStreams] = useState<any[]>([]);
+    const [nodes, setNodes] = useState<any[]>([]);
     const [cpuHistory, setCpuHistory] = useState<any[]>([]);
     const [memoryHistory, setMemoryHistory] = useState<any[]>([]);
     const [activities, setActivities] = useState<any[]>([]);
@@ -95,7 +97,11 @@ export default function Dashboard() {
 
         const initialLoad = async () => {
             try {
-                const data = await apiFetch('/api/streams/dashboard/summary', { skipCache: true });
+                const [data, nData] = await Promise.all([
+                    apiFetch('/api/streams/dashboard/summary', { skipCache: true }),
+                    apiFetch('/api/nodes', { skipCache: true })
+                ]);
+                
                 if (data) {
                     setMetrics(prev => ({ 
                         ...prev, 
@@ -107,6 +113,9 @@ export default function Dashboard() {
                     }));
                     setStreams(data.activeStreams || []);
                     setActivities(data.activities || []);
+                }
+                if (nData) {
+                    setNodes(nData);
                 }
             } catch (err) {
                 console.error('Dashboard Load Error:', err);
@@ -186,6 +195,8 @@ export default function Dashboard() {
             </div>
 
             {/* METRICS GRID */}
+            <NodeGrid nodes={nodes} />
+
             <div className="pro-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: '30px' }}>
                 <MetricCard icon={<Activity />} label="ACTIVE INSTANCES" value={metrics.activeStreams} color="indigo" variants={cardVariants} />
                 <MetricCard icon={<Eye />} label="TOTAL REACH" value={metrics.totalViews.toLocaleString()} color="emerald" variants={cardVariants} />

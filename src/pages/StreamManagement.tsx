@@ -1,10 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react'; // HMR TRIGGER
 import io from 'socket.io-client';
-import { type Socket } from 'socket.io-client';
-
 import { apiFetch, BASE_URL } from '../api';
 import './StreamManagement.css';
-import { NodeGrid } from '../components/stream-management/NodeGrid';
 import { StreamList } from '../components/stream-management/StreamList';
 import { AddStreamModal } from '../components/stream-management/AddStreamModal';
 import { LogViewer } from '../components/stream-management/LogViewer';
@@ -20,8 +17,11 @@ export default function StreamManagement() {
     const [allVideos, setAllVideos] = useState<any[]>([]);
     const [aiLoading, setAiLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [isLogDrawerOpen, setIsLogDrawerOpen] = useState(false);
+    const [selectedStreams, setSelectedStreams] = useState<string[]>([]);
+    
     const [newStream, setNewStream] = useState({
-        id: '', // Added for editing
+        id: '',
         title: '',
         platform: 'YOUTUBE',
         rtmp_url: 'rtmp://a.rtmp.youtube.com/live2',
@@ -36,19 +36,20 @@ export default function StreamManagement() {
 
     const socketRef = useRef<any>(null);
 
-    // ── DATA FETCHING ──
     const loadAll = useCallback(async () => {
         try {
             setLoading(true);
             setErrorMsg(null);
-            const [s, n, v] = await Promise.all([
+            const [s, n, v, sch] = await Promise.all([
                 apiFetch('/api/streams', { skipCache: true }),
                 apiFetch('/api/nodes', { skipCache: true }),
-                apiFetch('/api/media/videos', { cacheTTL: 600000 })
+                apiFetch('/api/media/videos', { cacheTTL: 600000 }),
+                apiFetch('/api/schedules', { skipCache: true })
             ]);
             setStreams(s);
             setNodes(n);
-            setAllVideos(v);
+            setAllVideos(v || []);
+            setSchedules(sch || []);
         } catch (err: any) {
             setErrorMsg('Gagal memuat data: ' + err.message);
         } finally {
@@ -61,286 +62,262 @@ export default function StreamManagement() {
     }, [loadAll]);
 
     useEffect(() => {
-        // Setup Socket.io connection
-        const socket = io(BASE_URL || window.location.origin);
+        const socket = io(BASE_URL || window.location.origin, {
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000
+        });
         socketRef.current = socket;
 
-        socket.on('connect', () => addLog('Connected to Real-time Engine', 'success'));
-        socket.on('disconnect', () => addLog('Disconnected from Real-time Engine', 'warn'));
-
-        socket.on('stream_status_change', (data: { id: string, status: string }) => {
-            setStreams(prev => prev.map(s => s.id === data.id ? { ...s, status: data.status === 'MULAI' || data.status === 'LIVE' ? 'RUNNING' : 'OFFLINE' } : s));
-            addLog(`Stream ${data.id} status changed to ${data.status}`, 'info');
+        socket.on('connect', () => {
+            loadAll();
         });
 
-        socket.on('DASHBOARD_UPDATE', (payload: any) => {
-            if (payload.streams) {
-                setStreams(prev => prev.map(s => {
-                    const metric = payload.streams.find((m: any) => m.id === s.id);
-                    if (metric) {
-                        return { ...s, bitrate: metric.bitrate + ' kbps', viewer_count: metric.viewers || s.viewer_count };
-                    }
-                    return s;
-                }));
-            }
-            if (payload.metrics) {
-                setNodes(prev => prev.map(n => n.id === 'node-1' ? { ...n, load: payload.metrics.cpu } : n));
-            }
+        socket.on('disconnect', (reason) => {
+            if (reason === 'io server disconnect') socket.connect();
+        });
+
+        socket.on('stream_status_change', (data: { id: string, status: string }) => {
+            setStreams(prev => prev.map(s => {
+                if (s.id === data.id) {
+                    const mappedStatus = (data.status === 'MULAI' || data.status === 'LIVE' || data.status === 'RUNNING') ? 'RUNNING' : 'OFFLINE';
+                    return { ...s, status: mappedStatus };
+                }
+                return s;
+            }));
         });
 
         return () => {
             socket.disconnect();
         };
-    }, []);
-
-    // ── LOGIC ──
-    const addLog = (msg: string, type: LogEntry['type'] = 'info') => {
-        const time = new Date().toLocaleTimeString('id-ID');
-        setLogs(prev => [{ time, msg, type }, ...prev.slice(0, 29)]);
-    };
-
-    const pickBestNode = () => {
-        const onlineNodes = nodes.filter(n => n.status === 'ONLINE');
-        if (!onlineNodes.length) return null;
-        return [...onlineNodes].sort((a, b) => a.load - b.load)[0];
-    };
+    }, [loadAll]);
 
     const handleAction = async (id: string, action: 'start' | 'stop') => {
-        const node = pickBestNode();
-        if (!node && action === 'start') return alert('Tidak ada VPS Online yang tersedia!');
-        
         const stream = streams.find(s => s.id === id);
-        const targetNode = action === 'start' ? node : nodes.find(n => n.id === stream?.node);
-        
-        const url = targetNode ? `${targetNode.url}/api/streams/${id}/${action}` : `/api/streams/${id}/${action}`;
+        const node = nodes.find(n => n.id === stream?.node) || nodes[0];
+        const url = node ? `${node.url}/api/system/streams/${id}/${action}` : `/api/system/streams/${id}/${action}`;
         
         try {
             setLoading(true);
-            addLog(`${action.toUpperCase()} request sent for ${id} to ${targetNode?.name || 'Local'}`, 'info');
             await apiFetch(url, { method: 'POST' });
             loadAll();
         } catch (err: any) {
-            addLog(`Error ${action}: ${err.message}`, 'error');
+            alert(`Error ${action}: ${err.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleMasterStop = async () => {
-        if (!window.confirm('🚨 PERINGATAN KRITIKAL: Anda akan mematikan SELURUH stream di SEMUA node. Lanjutkan?')) return;
-        try {
-            setLoading(true);
-            await apiFetch('/api/streams/emergency-stop', { method: 'POST' });
-            addLog('MASTER STOP: Seluruh stream telah dihentikan!', 'error');
-            loadAll();
-        } catch (err: any) {
-            alert('Gagal Master Stop: ' + err.message);
-        } finally {
-            setLoading(false);
-        }
+    const handleToggleSelect = (id: string) => {
+        setSelectedStreams(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
-    const handleDeleteStream = async (id: string) => {
-        if (!window.confirm('Hapus channel ini permanen? Tindakan ini tidak bisa dibatalkan.')) return;
-        try {
-            setLoading(true);
-            await apiFetch(`/api/streams/${id}`, { method: 'DELETE' });
-            addLog(`Stream berhasil dihapus`, 'success');
-            loadAll();
-        } catch (err: any) {
-            alert('Gagal menghapus stream: ' + err.message);
-        } finally {
-            setLoading(false);
-        }
+    const handleSelectAll = (checked: boolean) => {
+        setSelectedStreams(checked ? streams.map(s => s.id) : []);
     };
 
-    const handleEditStream = async (stream: Stream) => {
-        try {
-            setLoading(true);
-            // Fetch latest destinations for this stream
-            const destinations = await apiFetch(`/api/streams/${stream.id}/destinations`);
-            
-            setNewStream({
-                id: stream.id,
-                title: stream.title,
-                platform: (stream as any).platform || 'YOUTUBE',
-                rtmp_url: (stream as any).rtmp_url || '',
-                stream_key: (stream as any).stream_key || '',
-                playlist_path: (stream as any).playlist_path || '',
-                description: (stream as any).description || '',
-                tags: (stream as any).tags || '',
-                auto_restart: (stream as any).auto_restart !== 0,
-                ai_tone: (stream as any).ai_tone || 'viral',
-                destinations: destinations || []
-            });
-            setShowAddModal(true);
-        } catch (err: any) {
-            alert('Gagal memuat data edit: ' + err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const resetNewStream = () => {
-        setNewStream({ id: '', title: '', platform: 'YOUTUBE', rtmp_url: 'rtmp://a.rtmp.youtube.com/live2', stream_key: '', playlist_path: '', description: '', tags: '', auto_restart: true, ai_tone: 'viral', destinations: [] });
-    };
-
-    const handleToggleRestart = async (id: string, enabled: boolean) => {
-        try {
-            await apiFetch(`/api/streams/${id}`, {
-                method: 'PUT',
-                body: JSON.stringify({ auto_restart: enabled })
-            });
-            setStreams(prev => prev.map(s => s.id === id ? { ...s, auto_restart: enabled ? 1 : 0 } as any : s));
-            addLog(`Watchdog ${enabled ? 'ON' : 'OFF'} for ${id}`, enabled ? 'success' : 'warn');
-        } catch (err: any) {
-            alert('Gagal update restart setting: ' + err.message);
-        }
-    };
-
-    const handleCreateStream = async () => {
-        if (!newStream.title || !newStream.playlist_path) return alert('Judul dan Media wajib diisi!');
+    const handleBulkAction = async (action: 'start' | 'stop' | 'delete' | 'queue') => {
+        if (selectedStreams.length === 0) return;
+        if (!confirm(`Yakin ingin melakukan action ${action.toUpperCase()} pada ${selectedStreams.length} stream?`)) return;
         
         try {
             setLoading(true);
-            const method = newStream.id ? 'PUT' : 'POST';
-            const url = newStream.id ? `/api/streams/${newStream.id}` : '/api/streams';
-            
-            const res = await apiFetch(url, {
-                method,
-                body: JSON.stringify(newStream)
+            await apiFetch('/api/streams/bulk-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, ids: selectedStreams })
             });
-
-            setShowAddModal(false);
-            resetNewStream();
+            if (action === 'delete') {
+                setSelectedStreams([]);
+            }
             loadAll();
-            addLog(`Stream "${newStream.title}" berhasil disimpan`, 'success');
         } catch (err: any) {
-            alert('Gagal menyimpan stream: ' + err.message);
+            alert('Bulk Action Error: ' + err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const generateAIMetadata = async (tone: string = 'viral') => {
-        if (!newStream.title) return alert('Masukkan judul dasar terlebih dahulu!');
+
+    const handleGenerateAI = async () => {
+        if (!newStream.title) return alert('Inputkan Judul!');
         try {
             setAiLoading(true);
-            const res = await apiFetch('/api/automation/ai-metadata', {
+            const data = await apiFetch('/api/ai/generate-metadata', {
                 method: 'POST',
-                body: JSON.stringify({ title: newStream.title, tone })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    title: newStream.title,
+                    tone: newStream.ai_tone
+                })
             });
-            setNewStream({ 
-                ...newStream, 
-                title: res.title,
-                description: res.description,
-                tags: res.tags,
-                ai_tone: tone
-            });
-            addLog('AI Magic Wand: Konten berhasil dioptimasi!', 'success');
-        } catch (e: any) {
-            alert('AI Error: ' + e.message);
+            setNewStream(prev => ({ 
+                ...prev, 
+                description: data.description || prev.description,
+                tags: data.tags || prev.tags 
+            }));
+        } catch (err: any) {
+            alert('AI Gagal: ' + err.message);
         } finally {
             setAiLoading(false);
         }
     };
 
-    // ── UI HELPERS ──
+    const handleCreateStream = async () => {
+        try {
+            setLoading(true);
+            const isEdit = streams.some(s => s.id === newStream.id);
+            const method = isEdit ? 'PUT' : 'POST';
+            const url = isEdit ? `/api/streams/${newStream.id}` : '/api/streams';
+            
+            await apiFetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newStream)
+            });
+            setShowAddModal(false);
+            loadAll();
+        } catch (err: any) {
+            alert('Gagal simpan stream: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (s: Stream) => {
+        setNewStream({
+            id: s.id,
+            title: s.title || '',
+            platform: s.platform || 'YOUTUBE',
+            rtmp_url: s.rtmp_url || 'rtmp://a.rtmp.youtube.com/live2',
+            stream_key: s.stream_key || '',
+            playlist_path: s.playlist_path || '',
+            description: s.description || '',
+            tags: s.tags || '',
+            auto_restart: s.auto_restart ?? true,
+            ai_tone: s.ai_tone || 'viral',
+            destinations: s.destinations || []
+        });
+        setShowAddModal(true);
+    };
+
+    const manageDestination = {
+        add: () => setNewStream(prev => ({ 
+            ...prev, 
+            destinations: [...prev.destinations, { platform: 'CUSTOM', rtmp_url: '', stream_key: '', active: true }] 
+        })),
+        update: (index: number, field: string, val: any) => setNewStream(prev => {
+            const copy = [...prev.destinations];
+            copy[index] = { ...copy[index], [field]: val };
+            return { ...prev, destinations: copy };
+        }),
+        remove: (index: number) => setNewStream(prev => ({
+            ...prev, 
+            destinations: prev.destinations.filter((_, i) => i !== index)
+        }))
+    };
+
     return (
-        <div className="stream-mgmt-container">
-            {/* Inline Error Banner */}
-            {errorMsg && (
-                <div style={{
-                    background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.3)',
-                    borderRadius: '12px', padding: '12px 20px', marginBottom: '20px',
-                    color: '#f43f5e', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                }}>
-                    <span>⚠️ {errorMsg}</span>
-                    <button onClick={() => { setErrorMsg(null); loadAll(); }} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', fontWeight: 700 }}>↺ Retry</button>
-                </div>
-            )}
+        <div className="stream-management-page animate-fade-in">
             <div className="mgmt-header">
-                <div>
-                    <h1>🌐 Multi-Node Controller</h1>
-                    <p className="subtitle">Manajemen distribusi siaran di seluruh infrastruktur VPS.</p>
+                <div className="header-info">
+                    <h1>📡 Stream Management</h1>
+                    <p className="subtitle">Operational Command Console v4.0.1</p>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button className="btn-add-stream" onClick={() => setShowAddModal(true)}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        New Stream
+                
+
+                <div className="header-actions">
+                    <button className="btn-add-stream" onClick={() => {
+                        setNewStream({ id: '', title: '', platform: 'YOUTUBE', rtmp_url: 'rtmp://a.rtmp.youtube.com/live2', stream_key: '', playlist_path: '', description: '', tags: '', auto_restart: true, ai_tone: 'viral', destinations: [] });
+                        setShowAddModal(true);
+                    }}>
+                         ➕ New Stream
                     </button>
-                    <button className="btn-panic" onClick={handleMasterStop}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                        Panic Stop
+                    <button className="btn-log-toggle" onClick={() => setIsLogDrawerOpen(true)}>
+                         Logs
                     </button>
-                    <button className="btn-refresh" onClick={loadAll} disabled={loading}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                        Sync Data
+                    <button className="btn-refresh-circle" onClick={loadAll} disabled={loading}>
+                        Sync
                     </button>
                 </div>
             </div>
 
-            <div className="mgmt-main-grid">
-                <section className="vps-section-wrapper">
-                    <NodeGrid nodes={nodes} />
-                    <LogViewer logs={logs} onClear={() => setLogs([])} />
-                </section>
-
-                <section className="streams-section-wrapper">
+            <div className="mgmt-workspace">
+                <div className="bulk-action-bar" style={{ display: 'flex', gap: '8px', padding: '10px 15px', background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid var(--glass-border)', alignItems: 'center' }}>
+                    <button className="sys-btn gray-btn" onClick={() => handleSelectAll(true)}>Centang All</button>
+                    <button className="sys-btn gray-btn" onClick={() => handleSelectAll(false)}>Uncheck All</button>
+                    <button className="sys-btn success-btn" onClick={() => handleBulkAction('start')}>Start Yang Dipilih</button>
+                    <button className="sys-btn warning-btn" onClick={() => handleBulkAction('stop')}>Stop Yang Dipilih</button>
+                    <button className="sys-btn brand-btn" onClick={() => handleBulkAction('queue')}>Pindahkan ke Antrean</button>
+                    <button className="sys-btn danger-btn" onClick={() => handleBulkAction('delete')}>Hapus Yang Dipilih</button>
+                    <span style={{marginLeft: 'auto', fontWeight: 'bold'}} className="selected-count">Dipilih: {selectedStreams.length}</span>
+                </div>
+                
+                <main className="streams-view table-mode">
+                    {errorMsg && <div className="error-banner">{errorMsg}</div>}
                     <StreamList 
                         streams={streams} 
-                        nodes={nodes} 
-                        onAction={handleAction} 
-                        onDelete={handleDeleteStream}
-                        onEdit={handleEditStream} 
-                        onToggleRestart={handleToggleRestart}
+                        nodes={nodes}
+                        onAction={handleAction}
+                        onEdit={handleEdit}
+                        onDelete={async (id) => { if(confirm('Hapus Channel ini?')) { await apiFetch(`/api/streams/${id}`, { method: 'DELETE' }); loadAll(); } } } 
+                        selectedStreams={selectedStreams}
+                        onToggleSelect={handleToggleSelect}
+                        onSelectAll={handleSelectAll}
                     />
-                    
-                    <div className="mini-schedule-area">
-                         <div className="section-title"><h3>📅 Upcoming Schedules</h3></div>
-                         <div className="mini-sched-table-wrapper">
-                             <table className="mini-table">
-                                 <thead>
-                                     <tr>
-                                         <th>Title</th>
-                                         <th>Start At</th>
-                                         <th>Status</th>
-                                     </tr>
-                                 </thead>
-                                 <tbody>
-                                     {schedules.slice(0, 5).map(sch => (
-                                         <tr key={sch.id}>
-                                             <td><strong>{streams.find(st => st.id === sch.stream_id)?.title || sch.stream_id}</strong></td>
-                                             <td>{new Date(sch.start_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
-                                             <td><span className={`status-tag ${sch.status.toLowerCase()}`}>{sch.status}</span></td>
-                                         </tr>
-                                     ))}
-                                     {schedules.length === 0 && <tr><td colSpan={3} className="empty-td">Tidak ada jadwal tertunda.</td></tr>}
-                                 </tbody>
-                             </table>
-                         </div>
-                    </div>
-                </section>
+                </main>
             </div>
 
             <AddStreamModal 
                 show={showAddModal}
-                onClose={() => { setShowAddModal(false); resetNewStream(); }}
+                onClose={() => setShowAddModal(false)}
                 onSubmit={handleCreateStream}
                 newStream={newStream}
                 setNewStream={setNewStream}
                 allVideos={allVideos}
-                aiLoading={aiLoading}
-                onGenerateAI={generateAIMetadata}
-                onAddDest={() => setNewStream({ ...newStream, destinations: [...newStream.destinations, { name: 'New Platform', platform: 'OTHER', rtmp_url: '', stream_key: '' }]})}
-                onUpdateDest={(idx, field, val) => {
-                    const next = [...newStream.destinations];
-                    next[idx] = { ...next[idx], [field]: val };
-                    setNewStream({ ...newStream, destinations: next });
-                }}
-                onRemoveDest={(idx) => setNewStream({ ...newStream, destinations: newStream.destinations.filter((_, i) => i !== idx) })}
                 loading={loading}
+                aiLoading={aiLoading}
+                onGenerateAI={handleGenerateAI}
+                onAddDest={manageDestination.add}
+                onUpdateDest={manageDestination.update}
+                onRemoveDest={manageDestination.remove}
             />
+
+            <div className={`log-drawer-overlay ${isLogDrawerOpen ? 'open' : ''}`} onClick={() => setIsLogDrawerOpen(false)}>
+                <div className="log-drawer-content" onClick={e => e.stopPropagation()}>
+                    {/* STICKY HEADER — selalu terlihat */}
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '14px 20px',
+                        background: '#060b14',
+                        borderBottom: '1px solid #1e293b',
+                        flexShrink: 0,
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 10
+                    }}>
+                        <span style={{ color: '#818cf8', fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            📡 Live Logs
+                            <span style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px' }}>
+                                {logs.length}
+                            </span>
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                                onClick={() => setLogs([])}
+                                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}
+                            >🗑 Clear</button>
+                            <button
+                                onClick={() => setIsLogDrawerOpen(false)}
+                                style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', width: '34px', height: '34px', borderRadius: '8px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                title="Tutup"
+                            >✕</button>
+                        </div>
+                    </div>
+                    <LogViewer logs={logs} onClear={() => setLogs([])} onClose={() => setIsLogDrawerOpen(false)} />
+                </div>
+            </div>
         </div>
     );
 }

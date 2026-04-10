@@ -130,8 +130,9 @@ router.post('/videos/:id/process', authMiddleware, async (req: AuthRequest, res)
         if (!row) {
             // Diagnostic: Log what actually exists in the DB
             dbLayer.db.all('SELECT id FROM videos ORDER BY upload_date DESC LIMIT 10', (dErr, rows) => {
-                const existing = rows ? rows.map(r => `"${r.id}"`).join(', ') : 'none';
+                const existing = rows ? rows.map((r: any) => `"${r.id}"`).join(', ') : 'none';
                 console.error(`[Process Error] Video "${id}" not found. Recent IDs: ${existing}`);
+
             });
             return res.status(404).json({ error: `Video ID "${id}" tidak ditemukan. Silakan upload ulang atau coba refresh daftar video.` });
         }

@@ -80,6 +80,28 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
         }
     });
 
+    // 3.1 CHANNEL SUMMARY (For ROSI UI)
+    router.get('/analytics/channel-summary', authMiddleware, async (req, res) => {
+        try {
+            const queries = {
+                totalLive: "SELECT COUNT(*) as count FROM streams",
+                kemarin: "SELECT COUNT(*) as count FROM streams WHERE date(created_at) = date('now', '-1 day')",
+                hariIni: "SELECT COUNT(*) as count FROM streams WHERE date(created_at) = date('now')",
+                mingguIni: "SELECT COUNT(*) as count FROM streams WHERE strftime('%W', created_at) = strftime('%W', 'now')",
+                bulanIni: "SELECT COUNT(*) as count FROM streams WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
+            };
+            
+            const results: any = {};
+            for (const [key, sql] of Object.entries(queries)) {
+                results[key] = await new Promise((resolve) => dbLayer.db.get(sql, [], (err, row: any) => resolve(row ? row.count : 0)));
+            }
+            res.json(results);
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+
     // 4. DASHBOARD SUMMARY
     router.get('/dashboard/summary', authMiddleware, async (req: AuthRequest, res) => {
         const result: any = { metrics: {}, activeStreamsCount: 0, totalSessions: 0, recentLogs: [] };
@@ -172,6 +194,7 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
                     
                     dbLayer.db.run(`COMMIT`, (err) => {
                         if (err) return res.status(500).json({ error: err.message });
+                        dbLayer.logAuditEvent(req.user!.id, req.user!.username, 'CREATE', 'stream', id, `Created stream: ${title}`);
                         res.json({ id, title, status: 'OFFLINE' });
                     });
                 }
@@ -180,7 +203,7 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
     });
 
     // 6.1 UPDATE STREAM (Full Sync)
-    router.put('/:id', authMiddleware, (req, res) => {
+    router.put('/:id', authMiddleware, (req: AuthRequest, res) => {
         const { id } = req.params;
         const { title, playlist_path, platform, stream_key, rtmp_url, destinations, auto_restart, ai_tone } = req.body;
         
@@ -210,6 +233,7 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
 
                     dbLayer.db.run(`COMMIT`, (err) => {
                         if (err) return res.status(500).json({ error: err.message });
+                        dbLayer.logAuditEvent(req.user!.id, req.user!.username, 'UPDATE', 'stream', id as string, `Updated stream details`);
                         res.json({ id, message: 'Stream updated successfully' });
                     });
                 }
@@ -218,7 +242,7 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
     });
 
     // 7. START STREAM
-    router.post('/:id/start', authMiddleware, async (req, res) => {
+    router.post('/:id/start', authMiddleware, async (req: AuthRequest, res) => {
         const { id } = req.params;
         try {
             const row: any = await new Promise((resolve, reject) => {
@@ -250,6 +274,7 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
 
             await streamManager.startStream(id as string, meta);
             dbLayer.db.run(`UPDATE streams SET status = 'RUNNING' WHERE id = ?`, [id]);
+            dbLayer.logAuditEvent(req.user!.id, req.user!.username, 'START', 'stream', id as string, `Started stream to ${meta.destinations.length} destinations`);
             res.json({ message: 'Stream starting...', id, platforms: meta.destinations.length });
         } catch (err: any) {
             res.status(500).json({ error: err.message });
@@ -257,12 +282,61 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
     });
 
     // 7.1 EMERGENCY STOP ALL
-    router.post('/emergency-stop', authMiddleware, adminOnly, async (req, res) => {
+    router.post('/emergency-stop', authMiddleware, adminOnly, async (req: AuthRequest, res) => {
         try {
             const count = streamManager.emergencyStopAll();
             dbLayer.db.run(`UPDATE streams SET status = 'OFFLINE' WHERE status = 'RUNNING'`);
             dbLayer.saveSystemLog('SYSTEM', 'warn', `EMERGENCY STOP: ${count} stream dihentikan paksa.`);
+            dbLayer.logAuditEvent(req.user!.id, req.user!.username, 'EMERGENCY_STOP', 'system', 'ALL', `Killed ${count} running streams`);
             res.json({ message: `Emergeny stop triggered. ${count} process killed.`, count });
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // 7.2 BULK ACTIONS
+    router.post('/bulk-action', authMiddleware, async (req: AuthRequest, res) => {
+        const { action, ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'No IDs provided' });
+        
+        try {
+            let processed = 0;
+            if (action === 'start') {
+                for (const id of ids) {
+                    try {
+                        const row: any = await new Promise((resolve) => dbLayer.db.get(`SELECT * FROM streams WHERE id = ?`, [id], (e, r) => resolve(r)));
+                        if (!row || row.status === 'RUNNING') continue;
+                        const dests: any[] = await new Promise((resolve) => dbLayer.db.all(`SELECT name, rtmp_url, stream_key FROM stream_destinations WHERE stream_id = ? AND is_enabled = 1`, [id], (e, r) => resolve(r || [])));
+                        const meta = {
+                            server_id: 'local-node', input_source: row.playlist_path, stream_key: row.stream_key, rtmp_url: row.rtmp_url,
+                            auto_restart: row.auto_restart, ai_tone: row.ai_tone, destinations: dests.length > 0 ? dests : [{ name: 'Default', rtmp_url: row.rtmp_url, stream_key: row.stream_key }],
+                            channel_name: row.title, youtube_account_id: row.youtube_account_id, is_concat: row.playlist_path.includes(','), loop_mode: 'repeat_all'
+                        };
+                        streamManager.startStream(id as string, meta).catch(() => {});
+                        dbLayer.db.run(`UPDATE streams SET status = 'RUNNING' WHERE id = ?`, [id]);
+                        processed++;
+                    } catch (e) {}
+                }
+            } else if (action === 'stop') {
+                for (const id of ids) {
+                    streamManager.stopStream(id);
+                    dbLayer.db.run(`UPDATE streams SET status = 'OFFLINE' WHERE id = ?`, [id]);
+                    processed++;
+                }
+            } else if (action === 'delete') {
+                for (const id of ids) {
+                    streamManager.stopStream(id);
+                    dbLayer.db.run(`DELETE FROM streams WHERE id = ?`, [id]);
+                    processed++;
+                }
+            } else if (action === 'queue') {
+                for (const id of ids) {
+                    dbLayer.db.run(`UPDATE streams SET is_queued = 1, status = 'QUEUED' WHERE id = ?`, [id]);
+                    processed++;
+                }
+            }
+            dbLayer.logAuditEvent(req.user!.id, req.user!.username, 'BULK_' + action.toUpperCase(), 'stream', 'multiple', `Bulk ${action} for ${processed} streams`);
+            res.json({ message: `Bulk ${action} completed: ${processed} streams`, processed });
         } catch (err: any) {
             res.status(500).json({ error: err.message });
         }
@@ -300,19 +374,21 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
     });
 
     // 8. STOP STREAM
-    router.post('/:id/stop', authMiddleware, (req, res) => {
+    router.post('/:id/stop', authMiddleware, (req: AuthRequest, res) => {
         const { id } = req.params;
         streamManager.stopStream(id as string);
         dbLayer.db.run(`UPDATE streams SET status = 'OFFLINE' WHERE id = ?`, [id]);
+        dbLayer.logAuditEvent(req.user!.id, req.user!.username, 'STOP', 'stream', id as string, 'Manual stop');
         res.json({ message: 'Stream stopped', id });
     });
 
     // 9. DELETE STREAM
-    router.delete('/:id', authMiddleware, (req, res) => {
+    router.delete('/:id', authMiddleware, (req: AuthRequest, res) => {
         const { id } = req.params;
         streamManager.stopStream(id as string);
         dbLayer.db.run(`DELETE FROM streams WHERE id = ?`, [id], (err) => {
             if (err) return res.status(500).json({ error: err.message });
+            dbLayer.logAuditEvent(req.user!.id, req.user!.username, 'DELETE', 'stream', id as string, 'Deleted stream entirely');
             res.json({ message: 'Stream deleted' });
         });
     });

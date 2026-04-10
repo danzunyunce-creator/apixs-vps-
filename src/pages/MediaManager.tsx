@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '../api';
-import VideoCompressor from '../components/VideoCompressor';
+import io from 'socket.io-client';
+import { apiFetch, BASE_URL } from '../api';
 import './MediaManager.css';
 
 interface Video {
@@ -20,7 +20,7 @@ export default function MediaManager() {
     const [uploading, setUploading] = useState(false);
     const [bulkPath, setBulkPath] = useState('');
     const [bulkLoading, setBulkLoading] = useState(false);
-    const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+    const [processingIds, setProcessingIds] = useState<Map<string, number>>(new Map()); // id -> percentage
 
     const loadVideos = useCallback(async () => {
         try {
@@ -33,6 +33,39 @@ export default function MediaManager() {
 
     useEffect(() => {
         loadVideos();
+
+        // Socket setup for real-time progress
+        const socket = io(BASE_URL || window.location.origin);
+
+        socket.on('compressionStarted', ({ videoId }) => {
+            setProcessingIds(prev => new Map(prev).set(videoId, 0));
+        });
+
+        socket.on('compressionProgress', ({ videoId, percent }) => {
+            setProcessingIds(prev => new Map(prev).set(videoId, percent));
+        });
+
+        socket.on('compressionFinished', ({ videoId }) => {
+            setProcessingIds(prev => {
+                const next = new Map(prev);
+                next.delete(videoId);
+                return next;
+            });
+            loadVideos(); // Refresh to show "Optimized" tag
+        });
+
+        socket.on('compressionError', ({ videoId, message }) => {
+            alert(`Optimization Error (${videoId}): ${message}`);
+            setProcessingIds(prev => {
+                const next = new Map(prev);
+                next.delete(videoId);
+                return next;
+            });
+        });
+
+        return () => {
+            socket.disconnect();
+        };
     }, [loadVideos]);
 
     const handleFiles = async (files: FileList | null) => {
@@ -57,16 +90,15 @@ export default function MediaManager() {
 
     const handleOptimize = async (id: string) => {
         try {
-            setProcessingIds(prev => new Set(prev).add(id));
+            setProcessingIds(prev => new Map(prev).set(id, 0));
             await apiFetch(`/api/media/videos/${id}/process`, {
                 method: 'POST',
                 body: JSON.stringify({ targetRes: 720 })
             });
-            alert('Optimasi dimulai di background. Cek log sistem untuk progress.');
         } catch (err: any) {
             alert('Gagal memulai optimasi: ' + err.message);
             setProcessingIds(prev => {
-                const next = new Set(prev);
+                const next = new Map(prev);
                 next.delete(id);
                 return next;
             });
@@ -181,9 +213,17 @@ export default function MediaManager() {
                                                     onClick={() => handleOptimize(v.id)}
                                                     disabled={processingIds.has(v.id)}
                                                     title="Optimize for Live"
-                                                    style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '4px 12px', borderRadius: '8px', cursor: 'pointer' }}
+                                                    style={{ 
+                                                        background: processingIds.has(v.id) ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                                                        color: processingIds.has(v.id) ? '#3b82f6' : '#10b981', 
+                                                        border: '1px solid rgba(16, 185, 129, 0.2)', 
+                                                        padding: '4px 12px', 
+                                                        borderRadius: '8px', 
+                                                        cursor: 'pointer',
+                                                        minWidth: '100px'
+                                                    }}
                                                 >
-                                                    {processingIds.has(v.id) ? '⌛' : '🪄 Optimize'}
+                                                    {processingIds.has(v.id) ? `⌛ ${processingIds.get(v.id)}%` : '🪄 Optimize'}
                                                 </button>
                                             )}
                                             <button className="q-del" onClick={() => handleDelete(v.id)} title="Hapus Permanen">×</button>

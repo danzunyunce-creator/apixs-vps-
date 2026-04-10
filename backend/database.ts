@@ -291,7 +291,9 @@ export async function initializeDatabase(): Promise<void> {
     { key: 'yt_api_key_1', value: '' },
     { key: 'yt_api_key_2', value: '' },
     { key: 'yt_client_id', value: '' },
-    { key: 'yt_client_secret', value: '' }
+    { key: 'yt_client_secret', value: '' },
+    { key: 'yt_client_id_2', value: '' },
+    { key: 'yt_client_secret_2', value: '' }
   ];
   for (const cfg of appConfigs) {
     await runQuery(`INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)`, [cfg.key, cfg.value]);
@@ -324,6 +326,10 @@ export async function initializeDatabase(): Promise<void> {
   await safeAddColumn('system_logs', 'source_ip', 'TEXT');
   await safeAddColumn('streams', 'auto_restart', 'INTEGER DEFAULT 1');
   await safeAddColumn('streams', 'ai_tone', "TEXT DEFAULT 'viral'");
+  await safeAddColumn('streams', 'privacy_status', "TEXT DEFAULT 'public'");
+  await safeAddColumn('streams', 'youtube_broadcast_id', 'TEXT');
+  await safeAddColumn('streams', 'youtube_job_status', "TEXT DEFAULT 'pending'");
+  await safeAddColumn('streams', 'is_queued', 'INTEGER DEFAULT 0');
   
   // Seed Admin Accounts
   const hash1 = bcrypt.hashSync('liveapixs', 10);
