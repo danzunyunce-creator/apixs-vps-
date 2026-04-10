@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Send, ArrowLeft, RefreshCw, User, ShieldCheck } from 'lucide-react';
@@ -15,9 +14,12 @@ interface ChatMessage {
     publishedAt: string;
 }
 
-export default function LiveChat() {
-    const { id } = useParams();
-    const navigate = useNavigate();
+interface LiveChatProps {
+    streamId: string;
+    onBack: () => void;
+}
+
+export default function LiveChat({ streamId, onBack }: LiveChatProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [liveChatId, setLiveChatId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ export default function LiveChat() {
         fetchChat();
         const interval = setInterval(fetchChat, 10000); // Poll every 10s
         return () => clearInterval(interval);
-    }, [id]);
+    }, [streamId]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -42,7 +44,7 @@ export default function LiveChat() {
     const fetchChat = async () => {
         setPolling(true);
         try {
-            const res = await apiFetch(`/api/streams/live-chat/${id}`);
+            const res = await apiFetch(`/api/streams/live-chat/${streamId}`);
             if (res.messages) {
                 // Prevent duplicate messages
                 setMessages(prev => {
@@ -66,7 +68,7 @@ export default function LiveChat() {
 
         setSending(true);
         try {
-            await apiFetch(`/api/streams/live-chat/${id}/message`, {
+            await apiFetch(`/api/streams/live-chat/${streamId}/message`, {
                 method: 'POST',
                 body: JSON.stringify({ message: reply, liveChatId })
             });
@@ -95,14 +97,14 @@ export default function LiveChat() {
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <button className="btn-icon" onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '10px', borderRadius: '50%', cursor: 'pointer' }}>
+                    <button className="btn-icon" onClick={onBack} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '10px', borderRadius: '50%', cursor: 'pointer' }}>
                         <ArrowLeft size={18} />
                     </button>
                     <div>
                         <h2 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <MessageCircle size={20} color="#6366f1" /> LIVE CHAT HUB
                         </h2>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-dim)' }}>Stream ID: {id} {polling && <span style={{ color: '#6366f1', fontSize: '0.7rem' }}>• Syncing...</span>}</p>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-dim)' }}>Stream ID: {streamId} {polling && <span style={{ color: '#6366f1', fontSize: '0.7rem' }}>• Syncing...</span>}</p>
                     </div>
                 </div>
             </div>

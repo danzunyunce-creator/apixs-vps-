@@ -7,7 +7,11 @@ import { AddStreamModal } from '../components/stream-management/AddStreamModal';
 import { LogViewer } from '../components/stream-management/LogViewer';
 import { Node, Stream, LogEntry, Schedule } from '../types';
 
-export default function StreamManagement() {
+interface StreamManagementProps {
+    onChatOpen?: (id: string) => void;
+}
+
+export default function StreamManagement({ onChatOpen }: StreamManagementProps) {
     const [streams, setStreams] = useState<Stream[]>([]);
     const [nodes, setNodes] = useState<Node[]>([]);
     const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -263,6 +267,7 @@ export default function StreamManagement() {
                         selectedStreams={selectedStreams}
                         onToggleSelect={handleToggleSelect}
                         onSelectAll={handleSelectAll}
+                        onChatOpen={onChatOpen}
                     />
                 </main>
             </div>

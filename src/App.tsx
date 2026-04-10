@@ -56,6 +56,7 @@ function App() {
 
   const [activePage, setActivePage] = useState('dashboard');
   const [showToolkit, setShowToolkit] = useState(false);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [cachedPages, setCachedPages] = useState<Record<string, boolean>>({ dashboard: true });
   const { theme, toggle: toggleTheme } = useTheme();
 
@@ -125,12 +126,28 @@ function App() {
       <main className="compact-workspace">
         <Suspense fallback={<div className="sync-spinner">SYNCING...</div>}>
             <div style={{ display: activePage === 'dashboard' ? 'block' : 'none' }}>{cachedPages['dashboard'] && <Dashboard />}</div>
-            <div style={{ display: activePage === 'streams' ? 'block' : 'none' }}>{cachedPages['streams'] && <StreamManagement />}</div>
+            <div style={{ display: activePage === 'streams' ? 'block' : 'none' }}>
+                {cachedPages['streams'] && (
+                    <StreamManagement onChatOpen={(id) => {
+                        setActiveChatId(id);
+                        setActivePage('live-chat');
+                        setCachedPages(p => ({ ...p, 'live-chat': true }));
+                    }} />
+                )}
+            </div>
             <div style={{ display: activePage === 'automation' ? 'block' : 'none' }}>{cachedPages['automation'] && <YTAutomation />}</div>
             <div style={{ display: activePage === 'media' ? 'block' : 'none' }}>{cachedPages['media'] && <MediaManager />}</div>
             <div style={{ display: activePage === 'channels' ? 'block' : 'none' }}>{cachedPages['channels'] && <ChannelManager />}</div>
             <div style={{ display: activePage === 'scheduler' ? 'block' : 'none' }}>{cachedPages['scheduler'] && <Scheduler />}</div>
             <div style={{ display: activePage === 'settings' ? 'block' : 'none' }}>{cachedPages['settings'] && <Settings />}</div>
+            <div style={{ display: activePage === 'live-chat' ? 'block' : 'none' }}>
+                {cachedPages['live-chat'] && activeChatId && (
+                    <LiveChat 
+                        streamId={activeChatId} 
+                        onBack={() => setActivePage('streams')} 
+                    />
+                )}
+            </div>
         </Suspense>
       </main>
 
