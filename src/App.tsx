@@ -17,7 +17,6 @@ const Login = lazy(() => import('./pages/Login'));
 const ChannelManager = lazy(() => import('./pages/ChannelManager'));
 const LiveChat = lazy(() => import('./pages/LiveChat'));
 
-import { SystemToolkitModal } from './components/stream-management/SystemToolkitModal';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 
 const DAYS_ID = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
@@ -56,7 +55,6 @@ function App() {
   });
 
   const [activePage, setActivePage] = useState('dashboard');
-  const [showToolkit, setShowToolkit] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [cachedPages, setCachedPages] = useState<Record<string, boolean>>({ dashboard: true });
   const { theme, toggle: toggleTheme } = useTheme();
@@ -120,7 +118,6 @@ function App() {
             <LiveClock />
           </div>
           <div className="bar-divider desktop-only-header" />
-          <button className="bar-icon-btn magic" onClick={() => setShowToolkit(true)} title="Magic Toolkit">🪄</button>
           <button className="bar-icon-btn" onClick={toggleTheme}>{theme === 'dark' ? '☀️' : '🌙'}</button>
           <button className="bar-logout-btn" onClick={handleLogout}>OUT</button>
         </div>
@@ -154,7 +151,6 @@ function App() {
         </Suspense>
       </main>
 
-      <SystemToolkitModal show={showToolkit} onClose={() => setShowToolkit(false)} />
       
       <MobileBottomNav 
         activePage={activePage} 
