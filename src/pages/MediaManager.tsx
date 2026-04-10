@@ -18,6 +18,7 @@ interface Video {
 export default function MediaManager() {
     const [videos, setVideos] = useState<Video[]>([]);
     const [uploading, setUploading] = useState(false);
+    const [search, setSearch] = useState('');
     const [bulkPath, setBulkPath] = useState('');
     const [bulkLoading, setBulkLoading] = useState(false);
     const [processingIds, setProcessingIds] = useState<Map<string, number>>(new Map()); // id -> percentage
@@ -141,6 +142,11 @@ export default function MediaManager() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
+    const filteredVideos = videos.filter(v => 
+        v.title.toLowerCase().includes(search.toLowerCase()) || 
+        v.id.toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
         <div className="pipeline-container">
             <div className="pipeline-header" style={{ marginBottom: 20 }}>
@@ -190,12 +196,31 @@ export default function MediaManager() {
                 {/* RIGHT COLUMN: VIDEO GALLERY */}
                 <div className="workspace-monitor">
                     <div className="monitor-card preview" style={{ height: 'calc(100vh - 200px)' }}>
-                        <h3>📚 Koleksi Video Tersedia ({videos.length})</h3>
-                        <div className="queue-list" style={{ maxHeight: 'calc(100% - 40px)' }}>
-                            {videos.length === 0 ? (
-                                <p className="empty-msg">Belum ada video master. Silakan upload terlebih dahulu.</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                            <h3>📚 Koleksi Video Tersedia ({filteredVideos.length})</h3>
+                            <div className="search-box" style={{ position: 'relative' }}>
+                                <input 
+                                    type="text" 
+                                    placeholder="Search videos..." 
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    style={{ 
+                                        padding: '8px 12px', 
+                                        background: 'rgba(255,255,255,0.05)', 
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        borderRadius: '8px',
+                                        color: 'white',
+                                        fontSize: '0.85rem',
+                                        width: '200px'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div className="queue-list" style={{ maxHeight: 'calc(100% - 60px)' }}>
+                            {filteredVideos.length === 0 ? (
+                                <p className="empty-msg">{search ? `No results for "${search}"` : 'Belum ada video master. Silakan upload terlebih dahulu.'}</p>
                             ) : (
-                                videos.map((v) => (
+                                filteredVideos.map((v) => (
                                     <div key={v.id} className="queue-item" style={{ alignItems: 'center' }}>
                                         <div className="q-num" style={{ background: v.filepath.includes('_proc_') ? '#10b981' : '#3b82f6', color: 'white' }}>
                                             {v.filepath.includes('_proc_') ? '✨' : '📼'}

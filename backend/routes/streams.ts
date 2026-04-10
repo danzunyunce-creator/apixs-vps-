@@ -101,6 +101,24 @@ export const createStreamRouter = (streamManager: StreamManager, io: Server) => 
         }
     });
 
+    // 3.2 HISTORICAL METRICS (For Charts)
+    router.get('/analytics/metrics', authMiddleware, async (req, res) => {
+        try {
+            dbLayer.db.all(
+                `SELECT viewers, bitrate, cpu_usage, created_at 
+                 FROM stream_metrics 
+                 ORDER BY created_at DESC LIMIT 48`,
+                [],
+                (err, rows) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                    res.json(rows ? rows.reverse() : []);
+                }
+            );
+        } catch (err: any) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
 
     // 4. DASHBOARD SUMMARY
     router.get('/dashboard/summary', authMiddleware, async (req: AuthRequest, res) => {

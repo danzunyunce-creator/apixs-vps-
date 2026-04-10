@@ -14,10 +14,19 @@ export default function Settings() {
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('general');
     const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+    const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
     useEffect(() => {
         load();
+        loadAudit();
     }, []);
+
+    const loadAudit = async () => {
+        try {
+            const data = await apiFetch('/api/system/audit?limit=20');
+            setAuditLogs(data || []);
+        } catch (err) {}
+    };
 
     const load = async () => {
         try {
@@ -63,6 +72,7 @@ export default function Settings() {
         { id: 'telegram', label: 'Telegram Bot', icon: <Send size={18} /> },
         { id: 'automation', label: 'Automation', icon: <Zap size={18} /> },
         { id: 'ai', label: 'AI Engine', icon: <Brain size={18} /> },
+        { id: 'security', label: 'Security & Audit', icon: <Shield size={18} /> },
         { id: 'advanced', label: 'System Core', icon: <Shield size={18} /> },
     ];
 
@@ -151,6 +161,34 @@ export default function Settings() {
                                             </select>
                                         </div>
                                     </div>
+
+                                    <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <h4 style={{ color: 'white', marginBottom: '15px' }}>Universal Broadcast Policy</h4>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+                                            <div className="field">
+                                                <label>Default Bitrate (kbps)</label>
+                                                <input className="pro-input" type="number" value={config.default_bitrate || '2500'} onChange={e => setConfig({...config, default_bitrate: e.target.value})} />
+                                            </div>
+                                            <div className="field">
+                                                <label>Target Resolution</label>
+                                                <select className="pro-input" value={config.default_resolution || '1280x720'} onChange={e => setConfig({...config, default_resolution: e.target.value})}>
+                                                    <option value="1920x1080">1080p (Full HD)</option>
+                                                    <option value="1280x720">720p (HD)</option>
+                                                    <option value="854x480">480p (SD)</option>
+                                                    <option value="1080x1920">Vertical (1080p)</option>
+                                                    <option value="720x1280">Vertical (720p)</option>
+                                                </select>
+                                            </div>
+                                            <div className="field">
+                                                <label>Target Frame Rate (FPS)</label>
+                                                <select className="pro-input" value={config.default_fps || '30'} onChange={e => setConfig({...config, default_fps: e.target.value})}>
+                                                    <option value="60">60 FPS</option>
+                                                    <option value="30">30 FPS</option>
+                                                    <option value="24">24 FPS</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </Section>
                             )}
 
@@ -220,6 +258,35 @@ export default function Settings() {
                                             <option value="viral">Viral & High-Energy</option>
                                             <option value="clickbait">Attention-Grabbing (CTR)</option>
                                         </select>
+                                    </div>
+                                </Section>
+                            )}
+
+                            {activeTab === 'security' && (
+                                <Section title="Audit Trail & Access Hub" sub="Monitoring recent administrative actions and login attempts.">
+                                    <div className="audit-table-mini" style={{ maxHeight: '450px', overflowY: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                            <thead>
+                                                <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-dim)' }}>
+                                                    <th style={{ padding: '10px' }}>LOG ID</th>
+                                                    <th>ACTION</th>
+                                                    <th>USER</th>
+                                                    <th>TIMESTAMP</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {auditLogs.length === 0 ? (
+                                                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>No audit records found.</td></tr>
+                                                ) : auditLogs.map(log => (
+                                                    <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                                        <td style={{ padding: '12px 10px', color: '#6366f1' }}>#{log.id}</td>
+                                                        <td style={{ fontWeight: 600 }}>{log.action}</td>
+                                                        <td>{log.username || 'System'}</td>
+                                                        <td style={{ color: 'var(--text-dim)' }}>{new Date(log.created_at).toLocaleString()}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </Section>
                             )}

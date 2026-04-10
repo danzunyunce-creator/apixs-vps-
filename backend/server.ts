@@ -5,6 +5,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import compression from 'compression';
+import helmet from 'helmet';
 
 import * as dbLayer from './database';
 import StreamManager from './streamManager';
@@ -24,6 +25,10 @@ import systemRoutes from './routes/system';
 import { securityHeaders, rateLimiter } from './middleware/security';
 
 const app = express();
+app.use(helmet({
+    contentSecurityPolicy: false, // Disable if it conflicts with FontGoogle/Socket.io - we have manual headers too
+    crossOriginEmbedderPolicy: false
+}));
 app.use(securityHeaders); 
 app.use(compression());
 app.use(cors());

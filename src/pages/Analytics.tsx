@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
+import { 
+    AreaChart, Area, XAxis, YAxis, Tooltip, 
+    ResponsiveContainer, CartesianGrid 
+} from 'recharts';
 import './ModuleCommon.css';
 
 const StatCard = ({ title, value, icon, color }: any) => (
@@ -16,13 +19,19 @@ const StatCard = ({ title, value, icon, color }: any) => (
 
 export default function Analytics() {
     const [data, setData] = useState<any>(null);
+    const [metrics, setMetrics] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        apiFetch('/api/streams/analytics/summary')
-            .then(res => setData(res))
-            .catch(console.error)
-            .finally(() => setLoading(false));
+        Promise.all([
+            apiFetch('/api/streams/analytics/summary'),
+            apiFetch('/api/streams/analytics/metrics')
+        ]).then(([summary, metricLogs]) => {
+            setData(summary);
+            setMetrics(metricLogs || []);
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
     }, []);
 
     const exportCSV = () => {
@@ -54,8 +63,55 @@ export default function Analytics() {
             <div className="stats-grid">
                 <StatCard title="Total Jam Tayang" value={`${data?.totalHours || 0} Jam`} icon="⏱️" color="#38bdf8" />
                 <StatCard title="Total Sesi Siaran" value={data?.totalSessions || 0} icon="📡" color="#22c55e" />
-                <StatCard title="Peak Viewers (Est)" value="--" icon="📈" color="#f59e0b" />
+                <StatCard title="Peak Viewers (Est)" value={metrics.length > 0 ? Math.max(...metrics.map(m => m.viewers)) : "--"} icon="📈" color="#f59e0b" />
                 <StatCard title="Status Server" value="ONLINE" icon="✅" color="#10b981" />
+            </div>
+
+            {/* NEW: VISUAL CHART ROW */}
+            <div className="card" style={{ padding: '20px', marginBottom: '16px', height: '350px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h3 style={{ margin: 0 }}>📈 Historical Audience Trend (48h)</h3>
+                    <div style={{ display: 'flex', gap: '15px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <div style={{ width: '10px', height: '10px', background: '#6366f1', borderRadius: '50%' }} /> Peak Viewers
+                        </div>
+                    </div>
+                </div>
+                <div style={{ height: 'calc(100% - 50px)', width: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={metrics}>
+                            <defs>
+                                <linearGradient id="colorAudience" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                            <XAxis 
+                                dataKey="created_at" 
+                                tickFormatter={(val) => new Date(val).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                tick={{ fontSize: 10, fill: '#64748b' }}
+                                axisLine={false}
+                                tickLine={false}
+                            />
+                            <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <Tooltip 
+                                contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', fontSize: '12px', color: '#fff' }}
+                                itemStyle={{ color: '#6366f1' }}
+                                labelFormatter={(val) => new Date(val).toLocaleString()}
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="viewers" 
+                                stroke="#6366f1" 
+                                strokeWidth={3} 
+                                fillOpacity={1} 
+                                fill="url(#colorAudience)" 
+                                animationDuration={1000}
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>

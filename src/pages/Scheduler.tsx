@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, Clock, Play, Square, Edit3, Trash2, 
-  RotateCw, Search, Plus, Filter, Globe, Key 
+  RotateCw, Search, Plus, Filter, Globe, Key, Copy
 } from 'lucide-react';
 import { apiFetch } from '../api';
 import './ModuleCommon.css';
@@ -95,6 +95,22 @@ export default function Scheduler() {
         const nextStatus = currentStatus === 'RUNNING' ? 'COMPLETED' : 'RUNNING';
         await apiFetch(`/api/schedules/${id}/status`, { method: 'PUT', body: JSON.stringify({ status: nextStatus }) });
         loadData();
+    };
+
+    const handleDuplicate = (s: Schedule) => {
+        setFormData({
+            name: `${s.name} (Copy)`,
+            start: s.start_time.slice(0, 16),
+            end: s.end_time ? s.end_time.slice(0, 16) : '',
+            youtube_account_id: s.youtube_account_id || '',
+            playlist_path: s.playlist_path || '',
+            stream_key: s.stream_key || '',
+            is_recurring: !!s.is_recurring
+        });
+        setEditingId(null);
+        setShowForm(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        toast.success('Manifest copied to creator.');
     };
 
     const filtered = useMemo(() => {
@@ -256,6 +272,7 @@ export default function Scheduler() {
                                                 stream_key: s.stream_key || '',
                                                 is_recurring: !!s.is_recurring
                                             }); setShowForm(true); }} />
+                                            <ActionButton icon={<Copy size={14}/>} onClick={() => handleDuplicate(s)} />
                                             <ActionButton icon={<Trash2 size={14}/>} onClick={() => handleDelete(s.id)} danger />
                                         </div>
                                         <button 

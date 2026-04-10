@@ -302,7 +302,10 @@ export async function initializeDatabase(): Promise<void> {
     { key: 'yt_client_id', value: '' },
     { key: 'yt_client_secret', value: '' },
     { key: 'yt_client_id_2', value: '' },
-    { key: 'yt_client_secret_2', value: '' }
+    { key: 'yt_client_secret_2', value: '' },
+    { key: 'default_bitrate', value: '2500' },
+    { key: 'default_resolution', value: '1280x720' },
+    { key: 'default_fps', value: '30' }
   ];
   for (const cfg of appConfigs) {
     await runQuery(`INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)`, [cfg.key, cfg.value]);
