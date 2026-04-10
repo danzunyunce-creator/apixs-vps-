@@ -1,9 +1,11 @@
+import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
 import { 
     AreaChart, Area, XAxis, YAxis, Tooltip, 
     ResponsiveContainer, CartesianGrid 
 } from 'recharts';
 import './ModuleCommon.css';
+import toast, { Toaster } from 'react-hot-toast';
 
 const StatCard = ({ title, value, icon, color }: any) => (
     <div className="stat-card">
@@ -36,7 +38,7 @@ export default function Analytics() {
 
     const exportCSV = () => {
         const history = data?.history || [];
-        if (history.length === 0) return alert('Tidak ada data untuk diekspor.');
+        if (history.length === 0) return toast.error('Tidak ada data untuk diekspor.');
         const csvContent = "data:text/csv;charset=utf-8," 
             + "Stream ID,Mulai,Status,Durasi(Sec)\n"
             + history.map((e: any) => `${e.stream_id},${e.start_time},${e.status},${e.total_duration_seconds}`).join("\n");
@@ -52,6 +54,7 @@ export default function Analytics() {
 
     return (
         <div className="analytics-container">
+            <Toaster position="top-right" />
             <div className="analytics-header responsive-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '15px' }}>
                 <div>
                     <h2>📊 ANALYTICS</h2>

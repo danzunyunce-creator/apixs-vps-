@@ -141,6 +141,15 @@ export default function Dashboard() {
         });
     };
 
+    const handlePanicStop = async () => {
+        if (!confirm('Peringatan: Ini akan menghentikan SEMUA stream aktif. Lanjutkan?')) return;
+        toast.promise(apiFetch(`/api/streams/emergency-stop`, { method: 'POST' }), {
+            loading: 'Mengirim sinyal panic...',
+            success: 'Semua stream dihentikan paksa!',
+            error: 'Gagal menghentikan stream.'
+        });
+    };
+
     if (loading) return (
         <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0b0f19' }}>
             <motion.div 
@@ -182,7 +191,22 @@ export default function Dashboard() {
                         Broadcasting Operations • {now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
                 </div>
-                <div style={{ textAlign: 'right', color: 'white', flex: '1 1 300px' }} className="dash-time-resp">
+                <div style={{ textAlign: 'right', color: 'white', flex: '1 1 300px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }} className="dash-time-resp">
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+                        <button 
+                            onClick={handlePanicStop}
+                            style={{
+                                background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', 
+                                color: '#ef4444', padding: '8px 16px', borderRadius: '8px',
+                                display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
+                                fontWeight: 'bold', transition: 'all 0.3s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = '#ef4444'}
+                            onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                        >
+                            <AlertTriangle size={18} /> PANIC STOP ALL
+                        </button>
+                    </div>
                     <div style={{ fontSize: '2rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
                         {now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
+import toast, { Toaster } from 'react-hot-toast';
 import './UserManagement.css';
 
 export default function UserManagement() {
@@ -22,33 +23,36 @@ export default function UserManagement() {
     };
 
     const handleAdd = async () => {
-        if (!form.username || !form.password) return alert('Username dan Password wajib diisi.');
+        if (!form.username || !form.password) return toast.error('Username dan Password wajib diisi.');
         try {
             await apiFetch('/api/auth/register', {
                 method: 'POST',
                 body: JSON.stringify(form)
             });
+            toast.success('User berhasil diregistrasi!');
             setShowAdd(false);
             setForm({ username: '', password: '', role: 'user' });
             load();
         } catch (err: any) {
-            alert('Gagal menambah user: ' + err.message);
+            toast.error('Gagal menambah user: ' + err.message);
         }
     };
 
     const deleteUser = async (username: string) => {
-        if (username === 'zainulapixs') return alert('Admin utama tidak dapat dihapus.');
+        if (username === 'zainulapixs') return toast.error('Admin utama tidak dapat dihapus.');
         if (!confirm(`Permanen hapus user ${username}?`)) return;
         try {
             await apiFetch(`/api/auth/users/${username}`, { method: 'DELETE' });
+            toast.success('User dihapus.');
             load();
         } catch (err: any) {
-             alert('Gagal menghapus user: ' + err.message);
+             toast.error('Gagal menghapus user: ' + err.message);
         }
     };
 
     return (
         <div className="users-premium-container">
+            <Toaster position="top-right" />
             <div className="up-header">
                 <div>
                     <h1>👥 User Control Hub</h1>

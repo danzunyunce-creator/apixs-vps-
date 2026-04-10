@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../api';
+import toast, { Toaster } from 'react-hot-toast';
 import './YTAutomation.css';
 
 interface PipelineJob {
@@ -168,7 +169,7 @@ export default function YTAutomation() {
             });
             setAiResult(res);
         } catch (e: any) {
-            alert('AI Error: ' + e.message);
+            toast.error('AI Error: ' + e.message);
         } finally {
             setAiLoading(false);
         }
@@ -190,6 +191,7 @@ export default function YTAutomation() {
 
     return (
         <div className="yt-auto-container">
+            <Toaster position="top-right" />
             <div className="yt-auto-header">
                 <div>
                     <h1>🧠 YouTube Automation</h1>

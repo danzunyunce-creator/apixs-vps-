@@ -372,8 +372,10 @@ export async function initializeDatabase(): Promise<void> {
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_streams_user ON streams(user_id)`);
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_destinations_stream ON stream_destinations(stream_id)`);
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_sessions_stream ON stream_sessions(stream_id)`);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_sessions_stream_status ON stream_sessions(stream_id, status)`);
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_videos_user ON videos(user_id)`);
   await runQuery(`CREATE INDEX IF NOT EXISTS idx_history_stream ON stream_history(stream_id)`);
+  await runQuery(`CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at DESC)`);
   
   console.log('⚡ [Database] Indices optimized for high-speed queries.');
   console.log('✅ [Database] System Health: EXCELLENT. All tables and migrations validated.');

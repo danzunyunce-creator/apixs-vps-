@@ -7,6 +7,7 @@ import {
 import { apiFetch } from '../api';
 import './ModuleCommon.css';
 import './Scheduler.css';
+import toast, { Toaster } from 'react-hot-toast';
 
 interface Schedule {
     id: string;
@@ -36,7 +37,7 @@ export default function Scheduler() {
 
     const [formData, setFormData] = useState({
         name: '',
-        start: '',
+        start: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
         end: '',
         stream_key: '',
         playlist_path: '',
@@ -44,8 +45,7 @@ export default function Scheduler() {
         is_recurring: false,
         privacy: 'public',
         category: 'Entertainment',
-        is_upload: true,
-        start: new Date(Date.now() + 3600000).toISOString().slice(0, 16)
+        is_upload: true
     });
 
     const loadData = useCallback(async () => {
@@ -87,7 +87,7 @@ export default function Scheduler() {
             setEditingId(null);
             loadData();
         } catch (err: any) {
-            alert('Gagal simpan: ' + err.message);
+            toast.error('Gagal simpan: ' + err.message);
         } finally {
             setLoading(false);
         }
@@ -139,6 +139,8 @@ export default function Scheduler() {
             animate={{ opacity: 1 }}
             style={{ padding: '30px', maxWidth: '1400px', margin: '0 auto' }}
         >
+            <Toaster position="top-right" />
+            
             {/* ELITE HEADER */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
                 <div>
@@ -340,7 +342,10 @@ export default function Scheduler() {
                                                 youtube_account_id: s.youtube_account_id || '',
                                                 playlist_path: s.playlist_path || '',
                                                 stream_key: s.stream_key || '',
-                                                is_recurring: !!s.is_recurring
+                                                is_recurring: !!s.is_recurring,
+                                                privacy: s.privacy || 'public',
+                                                category: s.category || 'Entertainment',
+                                                is_upload: !!s.is_upload
                                             }); setShowForm(true); }} />
                                             <ActionButton icon={<Copy size={14}/>} onClick={() => handleDuplicate(s)} />
                                             <ActionButton icon={<Trash2 size={14}/>} onClick={() => handleDelete(s.id)} danger />

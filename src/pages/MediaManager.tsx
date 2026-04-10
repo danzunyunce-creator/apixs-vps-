@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import io from 'socket.io-client';
 import { apiFetch, BASE_URL } from '../api';
+import toast, { Toaster } from 'react-hot-toast';
 import './MediaManager.css';
 
 interface Video {
@@ -56,7 +57,7 @@ export default function MediaManager() {
         });
 
         socket.on('compressionError', ({ videoId, message }) => {
-            alert(`Optimization Error (${videoId}): ${message}`);
+            toast.error(`Optimization Error (${videoId}): ${message}`);
             setProcessingIds(prev => {
                 const next = new Map(prev);
                 next.delete(videoId);
@@ -77,13 +78,27 @@ export default function MediaManager() {
         Array.from(files).forEach(f => formData.append('videos', f));
 
         try {
-            await apiFetch('/api/media/videos/upload', {
+            const result = await apiFetch('/api/media/videos/upload', {
                 method: 'POST',
                 body: formData
             });
             await loadVideos();
+
+            // Auto-trigger normalize/optimize immediately after upload
+            const uploadedList = result?.videos || (Array.isArray(result) ? result : []);
+            for (const v of uploadedList) {
+                if (v && v.id) {
+                    // Fire-and-forget background optimization
+                    apiFetch(`/api/media/videos/${v.id}/process`, {
+                        method: 'POST',
+                        body: JSON.stringify({ targetRes: 720 })
+                    }).catch(() => { /* silent — socket compressionError handles UI feedback */ });
+                    
+                    setProcessingIds(prev => new Map(prev).set(v.id, 0));
+                }
+            }
         } catch (err: any) {
-            alert(`Gagal mengunggah: ${err.message}`);
+            toast.error(`Gagal mengunggah: ${err.message}`);
         } finally {
             setUploading(false);
         }
@@ -97,7 +112,7 @@ export default function MediaManager() {
                 body: JSON.stringify({ targetRes: 720 })
             });
         } catch (err: any) {
-            alert('Gagal memulai optimasi: ' + err.message);
+            toast.error('Gagal memulai optimasi: ' + err.message);
             setProcessingIds(prev => {
                 const next = new Map(prev);
                 next.delete(id);
@@ -112,23 +127,23 @@ export default function MediaManager() {
             await apiFetch(`/api/media/videos/${id}`, { method: 'DELETE' });
             setVideos(prev => prev.filter(v => v.id !== id));
         } catch (err: any) {
-            alert(`Gagal menghapus: ${err.message}`);
+            toast.error(`Gagal menghapus: ${err.message}`);
         }
     };
 
     const handleBulkIngest = async () => {
-        if (!bulkPath) return alert('Masukkan path folder server!');
+        if (!bulkPath) return toast.error('Masukkan path folder server!');
         try {
             setBulkLoading(true);
             const res = await apiFetch('/api/automation/bulk-ingest', {
                 method: 'POST',
                 body: JSON.stringify({ folderPath: bulkPath })
             });
-            alert(`✅ Sukses! ${res.count} video berhasil di-ingest dengan AI Metadata.`);
+            toast.success(`${res.count} video berhasil di-ingest dengan AI Metadata!`);
             setBulkPath('');
             loadVideos();
         } catch (err: any) {
-            alert('Bulk Error: ' + err.message);
+            toast.error('Bulk Error: ' + err.message);
         } finally {
             setBulkLoading(false);
         }
@@ -149,6 +164,7 @@ export default function MediaManager() {
 
     return (
         <div className="pipeline-container">
+            <Toaster position="top-right" />
             <div className="pipeline-header" style={{ marginBottom: 20 }}>
                 <h1>🎬 Master Video Library</h1>
                 <p>Unggah dan kelola aset Master Video Anda sebelum masuk ke Jadwal Tayang.</p>
@@ -230,6 +246,23 @@ export default function MediaManager() {
                                             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
                                                 {formatSize(v.file_size)} • {v.filepath.includes('_proc_') ? 'Optimized' : 'Raw'}
                                             </div>
+                                            {processingIds.has(v.id) && (
+                                                <div style={{ marginTop: '8px', width: '100%', maxWidth: '200px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#3b82f6', marginBottom: '4px', fontWeight: 700 }}>
+                                                        <span>AUTO-TRANSCODING</span>
+                                                        <span>{processingIds.get(v.id)}%</span>
+                                                    </div>
+                                                    <div style={{ width: '100%', height: '6px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                        <div style={{ 
+                                                            width: `${processingIds.get(v.id)}%`, 
+                                                            height: '100%', 
+                                                            background: 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                                                            boxShadow: '0 0 10px rgba(99, 102, 241, 0.5)',
+                                                            transition: 'width 0.5s ease-in-out' 
+                                                        }} />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="item-actions-resp" style={{ display: 'flex', gap: '8px' }}>
                                             {!v.filepath.includes('_proc_') && (

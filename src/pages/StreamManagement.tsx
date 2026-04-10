@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'; // HMR TRIGGER
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import io from 'socket.io-client';
 import { apiFetch, BASE_URL } from '../api';
+import toast, { Toaster } from 'react-hot-toast';
 import './StreamManagement.css';
 import { StreamList } from '../components/stream-management/StreamList';
 import { AddStreamModal } from '../components/stream-management/AddStreamModal';
@@ -105,7 +106,7 @@ export default function StreamManagement({ onChatOpen }: StreamManagementProps) 
             await apiFetch(url, { method: 'POST' });
             loadAll();
         } catch (err: any) {
-            alert(`Error ${action}: ${err.message}`);
+            toast.error(`Error ${action}: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -135,7 +136,7 @@ export default function StreamManagement({ onChatOpen }: StreamManagementProps) 
             }
             loadAll();
         } catch (err: any) {
-            alert('Bulk Action Error: ' + err.message);
+            toast.error('Bulk Action Error: ' + err.message);
         } finally {
             setLoading(false);
         }
@@ -143,7 +144,7 @@ export default function StreamManagement({ onChatOpen }: StreamManagementProps) 
 
 
     const handleGenerateAI = async () => {
-        if (!newStream.title) return alert('Inputkan Judul!');
+        if (!newStream.title) return toast.error('Inputkan Judul!');
         try {
             setAiLoading(true);
             const data = await apiFetch('/api/ai/generate-metadata', {
@@ -160,7 +161,7 @@ export default function StreamManagement({ onChatOpen }: StreamManagementProps) 
                 tags: data.tags || prev.tags 
             }));
         } catch (err: any) {
-            alert('AI Gagal: ' + err.message);
+            toast.error('AI Gagal: ' + err.message);
         } finally {
             setAiLoading(false);
         }
@@ -181,7 +182,7 @@ export default function StreamManagement({ onChatOpen }: StreamManagementProps) 
             setShowAddModal(false);
             loadAll();
         } catch (err: any) {
-            alert('Gagal simpan stream: ' + err.message);
+            toast.error('Gagal simpan stream: ' + err.message);
         } finally {
             setLoading(false);
         }
@@ -222,6 +223,7 @@ export default function StreamManagement({ onChatOpen }: StreamManagementProps) 
 
     return (
         <div className="stream-management-page animate-fade-in">
+            <Toaster position="top-right" />
             <div className="mgmt-header">
                 <div className="header-info">
                     <h1>📡 Stream Management</h1>

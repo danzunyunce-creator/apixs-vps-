@@ -97,12 +97,17 @@ export class StreamManager {
     private probeEncoders() {
         exec(`"${config.FFMPEG_PATH}" -encoders`, (err, stdout) => {
             if (err) return;
+            // Note: H264 is preferred over HEVC for standard RTMP compatibility (Facebook/Twitch).
             if (stdout.includes('h264_nvenc')) {
                 this.availableEncoder = 'h264_nvenc';
                 console.log('🚀 [StreamManager] NVIDIA NVENC Hardware detected! Using for streams.');
             } else if (stdout.includes('h264_vaapi')) {
                 this.availableEncoder = 'h264_vaapi';
                 console.log('🚀 [StreamManager] VAAPI Hardware (Intel/AMD) detected! Using for streams.');
+            } else if (stdout.includes('hevc_nvenc')) {
+                // Fallback to HEVC if H264 isn't available somehow
+                this.availableEncoder = 'hevc_nvenc';
+                console.log('🚀 [StreamManager] NVIDIA HEVC Hardware detected! Note: Ensure destination supports HEVC over RTMP.');
             } else {
                 this.availableEncoder = 'libx264';
                 console.log('💻 [StreamManager] No GPU detected. Using libx264 (CPU) with ultrafast preset.');
@@ -264,7 +269,9 @@ export class StreamManager {
             args.push('-c:v', this.availableEncoder);
             
             if (this.availableEncoder === 'h264_nvenc') {
-                args.push('-preset', 'p1', '-rc:v', 'vbr', '-cq:v', '26', '-maxrate', '3000k', '-bufsize', '6000k');
+                args.push('-preset', 'p3', '-tune', 'hq', '-rc:v', 'vbr', '-cq:v', '26', '-b:v', '2500k', '-maxrate', '3500k', '-bufsize', '6000k', '-profile:v', 'high', '-bf', '2');
+            } else if (this.availableEncoder === 'hevc_nvenc') {
+                args.push('-preset', 'p3', '-tune', 'hq', '-rc:v', 'vbr', '-cq:v', '28', '-b:v', '2000k', '-maxrate', '3000k', '-bufsize', '6000k');
             } else if (this.availableEncoder === 'h264_vaapi') {
                 args.push('-vaapi_device', '/dev/dri/renderD128');
                 videoFilters.push('format=nv12', 'hwupload');
@@ -292,7 +299,10 @@ export class StreamManager {
             // --- HYPER-SCALE SIMULCAST (Tee Muxer) ---
             const teeArgs = meta.destinations.map(d => {
                 const fullUrl = d.rtmp_url.endsWith('/') ? `${d.rtmp_url}${d.stream_key}` : `${d.rtmp_url}/${d.stream_key}`;
-                return `[f=flv]${fullUrl.replace(/[\[\]\|]/g, '\\$&')}`; // Escape tee chars
+                // Format for tee muxer. Using onfail=ignore so if one stream drops, the others continue running
+                // We escape correctly for the FFmpeg tee syntax
+                const escapedUrl = fullUrl.replace(/\|/g, '\\|').replace(/\]/g, '\\]').replace(/\[/g, '\\[');
+                return `[f=flv:onfail=ignore]${escapedUrl}`;
             }).join('|');
 
             args.push(
@@ -300,6 +310,7 @@ export class StreamManager {
                 '-c:a', 'aac',
                 '-b:a', '128k',
                 '-ar', '44100',
+                '-flags', '+global_header', // Required for tee muxer
                 '-f', 'tee',
                 teeArgs
             );
@@ -541,12 +552,17 @@ export class StreamManager {
             exec(cmd, (err, stdout) => {
                 if (err) return;
                 
-                // Simplified strategy: Kill FFmpeg if activeStreams is empty 
-                // (More advanced logic would involve checking PIDs)
-                if (this.activeStreams.size === 0 && stdout.toLowerCase().includes('ffmpeg')) {
-                    console.warn('⚠️ [Watchdog] Detected stray FFmpeg processes while no streams are active. Reaping...');
-                    const killCmd = platform === 'win32' ? 'taskkill /F /IM ffmpeg.exe' : 'pkill -9 ffmpeg';
-                    exec(killCmd);
+                // Enhanced strategy: Check if activeStreams is empty but FFmpeg processes exist.
+                // Using regex to ensure we don't kill other valid FFmpeg unrelated to streaming.
+                if (this.activeStreams.size === 0) {
+                    const ffmpegProcs = stdout.split('\n').filter(line => line.toLowerCase().includes('ffmpeg') && (line.includes('rtmp://') || line.includes('flv') || line.includes('tee')));
+                    if (ffmpegProcs.length > 0) {
+                        console.warn('⚠️ [Watchdog] Detected stray App FFmpeg processes while no streams are active. Reaping...');
+                        const killCmd = platform === 'win32' ? 'taskkill /F /IM ffmpeg.exe' : 'pkill -9 -f ffmpeg';
+                        exec(killCmd, () => {
+                            console.log('✅ [Watchdog] Stray processes cleared.');
+                        });
+                    }
                 }
             });
         }, 60000); // Check every minute

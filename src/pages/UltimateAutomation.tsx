@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '../api';
 import io from 'socket.io-client';
 import { BASE_URL } from '../api';
+import toast, { Toaster } from 'react-hot-toast';
 import './UltimateAutomation.css';
 
 const SOCKET_URL = window.location.origin;
@@ -48,8 +49,8 @@ export default function UltimateAutomation() {
     };
 
     const runMasterAutomation = async () => {
-        if (accounts.length === 0) return alert('Hubungkan minimal satu akun YouTube dulu!');
-        if (videos.length === 0) return alert('Unggah video ke Media Manager dulu!');
+        if (accounts.length === 0) return toast.error('Hubungkan minimal satu akun YouTube dulu!', { duration: 4000 });
+        if (videos.length === 0) return toast.error('Unggah video ke Media Manager dulu!', { duration: 4000 });
 
         setIsRunning(true);
         log('🚀 MEMULAI ULTIMATE MASS DEPLOYMENT...', 'success');
@@ -75,10 +76,16 @@ export default function UltimateAutomation() {
                 });
 
                 const nodes = await apiFetch('/api/nodes');
-                const bestNode = nodes.sort((a: any, b: any) => a.load - b.load)[0];
+                let bestNode = null;
+                if (nodes && nodes.length > 0) {
+                    bestNode = nodes.sort((a: any, b: any) => (a.load || 0) - (b.load || 0))[0];
+                }
                 
-                log(`🚀 Deploying ke Node: ${bestNode.name}...`);
-                await apiFetch(`${bestNode.url}/api/streams/${stream.id}/start`, { method: 'POST' });
+                const targetUrl = bestNode ? bestNode.url : '';
+                const nodeName = bestNode ? bestNode.name : 'Local Core';
+
+                log(`🚀 Deploying ke Node: ${nodeName}...`);
+                await apiFetch(`${targetUrl}/api/streams/${stream.id}/start`, { method: 'POST' });
 
                 log(`✅ BERHASIL: ${video.title} LIVE di ${acc.channel_name}`, 'success');
 
@@ -97,6 +104,7 @@ export default function UltimateAutomation() {
 
     return (
         <div className="ultimate-container">
+            <Toaster position="top-right" />
             <div className="ultimate-header">
                 <div>
                     <h1>🚀 Ultimate Automation</h1>
