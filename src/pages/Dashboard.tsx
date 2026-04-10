@@ -175,14 +175,14 @@ export default function Dashboard() {
             <Toaster position="top-right" toastOptions={{ style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' } }} />
             
             {/* ELITE HEADER */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '30px' }}>
-                <div>
-                    <motion.h1 style={{ fontSize: '2.5rem', marginBottom: '5px', color: 'white' }}>Terminal Overview</motion.h1>
+            <div className="dashboard-header-resp" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '30px', flexWrap: 'wrap', gap: '20px' }}>
+                <div style={{ flex: '1 1 300px' }}>
+                    <motion.h1 className="dash-title-resp" style={{ fontSize: '2.5rem', marginBottom: '5px', color: 'white' }}>Terminal Overview</motion.h1>
                     <div className="sub-header">
                         Broadcasting Operations • {now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
                 </div>
-                <div style={{ textAlign: 'right', color: 'white' }}>
+                <div style={{ textAlign: 'right', color: 'white', flex: '1 1 300px' }} className="dash-time-resp">
                     <div style={{ fontSize: '2rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
                         {now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </div>
@@ -225,7 +225,7 @@ export default function Dashboard() {
             </div>
 
             {/* ANALYTICS ROW */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
+            <div className="analytics-row-stackable" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
                 <motion.div className="glass-card-pro" variants={cardVariants}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
                         <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'white' }}><Cpu size={18} /> CPU REAL-TIME</h3>

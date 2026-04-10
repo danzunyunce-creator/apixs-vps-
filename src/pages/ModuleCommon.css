@@ -57,6 +57,10 @@ body {
   box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.7);
 }
 
+@media (max-width: 768px) {
+  .glass-card-pro { padding: 16px; border-radius: 14px; }
+}
+
 /* Neon Components */
 .neon-btn {
   background: var(--accent-primary);
@@ -115,4 +119,8 @@ h1, h2, h3 {
 .pro-grid {
   display: grid;
   gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .pro-grid { grid-template-columns: 1fr !important; gap: 12px; }
 }

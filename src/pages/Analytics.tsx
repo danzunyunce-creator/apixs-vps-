@@ -52,7 +52,7 @@ export default function Analytics() {
 
     return (
         <div className="analytics-container">
-            <div className="analytics-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div className="analytics-header responsive-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '15px' }}>
                 <div>
                     <h2>📊 ANALYTICS</h2>
                     <p className="subtitle">Data performa dan riwayat siaran langsung Anda.</p>
@@ -114,7 +114,7 @@ export default function Analytics() {
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div className="analytics-sub-grid pro-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div className="card" style={{ padding: '12px' }}>
                     <h3 style={{ marginTop: 0, fontSize: '14px' }}>🏆 TOP PERFORMING MEDIA</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>

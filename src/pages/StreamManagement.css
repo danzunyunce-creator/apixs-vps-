@@ -21,6 +21,17 @@
     z-index: 100;
 }
 
+@media (max-width: 768px) {
+    .mgmt-top-header {
+        flex-direction: column;
+        padding: 16px;
+        gap: 16px;
+        align-items: flex-start;
+    }
+    .header-brand h1 { font-size: 1.4rem !important; }
+    .header-actions { width: 100%; justify-content: space-between; }
+}
+
 .header-brand h1 {
     font-size: 1.8rem !important;
     margin: 0;
@@ -161,12 +172,17 @@
 /* --- STREAMS ROW SYSTEM (REMOVED) --- */
 
 /* --- MAGIC TOOLKIT MODAL --- */
-.toolkit-modal {
-    width: 600px !important;
-    max-width: 95vw;
-    background: #0f172a !important;
     border: 1px solid var(--accent-indigo) !important;
     box-shadow: 0 0 50px rgba(99, 102, 241, 0.2) !important;
+}
+
+@media (max-width: 768px) {
+    .toolkit-modal, .glass-modal.large {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+    }
 }
 
 .performance-grid {
@@ -439,14 +455,12 @@
 }
 
 /* TABLE UI & BULK ACTION BAR */
-.channel-summary-bar {
-    background: rgba(15, 23, 42, 0.6);
-    border-radius: 12px 12px 0 0;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
     border-bottom: 1px solid var(--glass-border);
+}
+
+@media (max-width: 768px) {
+    .channel-summary-bar { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .summary-pills { flex-wrap: wrap; }
 }
 
 .summary-title {
@@ -570,15 +584,16 @@
     color: #e2e8f0;
 }
 
-.badge-job {
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-weight: 700;
-    font-size: 0.7rem;
-}
-.badge-job.running { background: #10b981; color: white; }
-.badge-job.queued { background: #f59e0b; color: white; }
 .badge-job.done { background: rgba(255, 255, 255, 0.1); color: #94a3b8; }
+
+@media (max-width: 768px) {
+    .t-stream-id, .t-priv, .t-jadwal, .t-retry, .t-broad-id {
+        display: none !important;
+    }
+    .t-no { width: 30px; }
+    .t-aksi { width: 100px; }
+    .t-nama, .t-nama-live { max-width: 120px; }
+}
 
 /* BULK BUTTONS */
 .sys-btn {

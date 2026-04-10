@@ -154,7 +154,7 @@ export default function MediaManager() {
                 <p>Unggah dan kelola aset Master Video Anda sebelum masuk ke Jadwal Tayang.</p>
             </div>
 
-            <div className="pipeline-workspace" style={{ gridTemplateColumns: 'minmax(300px, 350px) 1fr' }}>
+            <div className="pipeline-workspace responsive-grid-stack" style={{ gridTemplateColumns: 'minmax(300px, 350px) 1fr' }}>
                 {/* LEFT COLUMN: UPLOADER */}
                 <div className="workspace-actions">
                     <div className="action-card focus">
@@ -195,7 +195,7 @@ export default function MediaManager() {
 
                 {/* RIGHT COLUMN: VIDEO GALLERY */}
                 <div className="workspace-monitor">
-                    <div className="monitor-card preview" style={{ height: 'calc(100vh - 200px)' }}>
+                    <div className="monitor-card preview dynamic-height-resp" style={{ height: 'calc(100vh - 200px)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                             <h3>📚 Koleksi Video Tersedia ({filteredVideos.length})</h3>
                             <div className="search-box" style={{ position: 'relative' }}>
@@ -226,12 +226,12 @@ export default function MediaManager() {
                                             {v.filepath.includes('_proc_') ? '✨' : '📼'}
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                            <div className="q-title" style={{ fontWeight: 600, fontSize: '1rem', color: '#f8fafc' }}>{v.title}</div>
-                                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                                            <div className="q-title" style={{ fontWeight: 600, fontSize: '0.95rem', color: '#f8fafc' }}>{v.title}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
                                                 {formatSize(v.file_size)} • {v.filepath.includes('_proc_') ? 'Optimized' : 'Raw'}
                                             </div>
                                         </div>
-                                        <div className="item-actions" style={{ display: 'flex', gap: '8px' }}>
+                                        <div className="item-actions-resp" style={{ display: 'flex', gap: '8px' }}>
                                             {!v.filepath.includes('_proc_') && (
                                                 <button 
                                                     className={`btn-optimize ${processingIds.has(v.id) ? 'loading' : ''}`}

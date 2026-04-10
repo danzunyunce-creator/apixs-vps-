@@ -18,6 +18,7 @@ const ChannelManager = lazy(() => import('./pages/ChannelManager'));
 const LiveChat = lazy(() => import('./pages/LiveChat'));
 
 import { SystemToolkitModal } from './components/stream-management/SystemToolkitModal';
+import { MobileBottomNav } from './components/layout/MobileBottomNav';
 
 const DAYS_ID = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
 
@@ -115,8 +116,10 @@ function App() {
         </div>
 
         <div className="bar-right">
-          <LiveClock />
-          <div className="bar-divider" />
+          <div className="desktop-only-header">
+            <LiveClock />
+          </div>
+          <div className="bar-divider desktop-only-header" />
           <button className="bar-icon-btn magic" onClick={() => setShowToolkit(true)} title="Magic Toolkit">🪄</button>
           <button className="bar-icon-btn" onClick={toggleTheme}>{theme === 'dark' ? '☀️' : '🌙'}</button>
           <button className="bar-logout-btn" onClick={handleLogout}>OUT</button>
@@ -152,6 +155,22 @@ function App() {
       </main>
 
       <SystemToolkitModal show={showToolkit} onClose={() => setShowToolkit(false)} />
+      
+      <MobileBottomNav 
+        activePage={activePage} 
+        onPageChange={(page) => {
+          if (page === 'chat') setActivePage('live-chat');
+          else setActivePage(page);
+          setCachedPages(p => ({ ...p, [page === 'chat' ? 'live-chat' : page]: true }));
+        }} 
+      />
+
+      <style>{`
+        @media (max-width: 768px) {
+          .desktop-only-header { display: none; }
+          .compact-workspace { padding: 10px; }
+        }
+      `}</style>
     </div>
   );
 }

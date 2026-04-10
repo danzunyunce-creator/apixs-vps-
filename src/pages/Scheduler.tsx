@@ -149,9 +149,11 @@ export default function Scheduler() {
             </div>
 
             {/* QUICK TIMELINE VISUALIZER (BETA) */}
-            <TimelineOverview schedules={schedules} />
+            <div className="timeline-scroll-resp">
+                <TimelineOverview schedules={schedules} />
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: showForm ? '450px 1fr' : '1fr', gap: '30px', transition: 'all 0.3s' }}>
+            <div className="responsive-grid-stack" style={{ display: 'grid', gridTemplateColumns: showForm ? '450px 1fr' : '1fr', gap: '30px', transition: 'all 0.3s' }}>
                 <AnimatePresence>
                     {showForm && (
                         <motion.div 
@@ -216,7 +218,7 @@ export default function Scheduler() {
                                 onChange={e => setSearch(e.target.value)}
                             />
                         </div>
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div className="responsive-flex" style={{ display: 'flex', gap: '10px' }}>
                             {['ALL', 'SCHEDULED', 'RUNNING'].map(f => (
                                 <button 
                                     key={f} 
