@@ -344,11 +344,12 @@ export class StreamManager {
                     return;
                 }
             } else if (!inputSource.startsWith('rtmp')) {
-                // local path check
+                // --- 🛡️ HARDENED PATH JAIL ---
                 const normalizedBase = path.resolve(config.UPLOADS_DIR);
                 const normalizedTarget = path.resolve(inputSource);
-                if (!normalizedTarget.startsWith(normalizedBase) && !inputSource.includes('concat')) {
-                    const errMsg = `🛡️ [Security] Gagal: Akses file di luar jail dilarang (Path Traversal attempt).`;
+                
+                if (!normalizedTarget.startsWith(normalizedBase)) {
+                    const errMsg = `🛡️ [Security] Gagal: Akses file di luar jail dilarang (${inputSource}).`;
                     this.emitLog(id, 'error', errMsg);
                     dbLayer.saveSystemLog(id, 'error', errMsg).catch(() => {});
                     await dbLayer.updateStreamStatus(id, 'ERROR');

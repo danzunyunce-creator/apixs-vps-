@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { exec } from 'child_process';
+import { AIService } from './services/aiService';
 
 export class AutomationEngine {
     private sm: StreamManager;
@@ -518,11 +519,14 @@ export class AutomationEngine {
                 const videoPath = row.filepath;
                 const safeTitle = (titleShort || 'LIVE STREAMING').replace(/'/g, "’").toUpperCase();
 
-                // FFmpeg Logic: Capture frame @ 00:01:00 + Overlay Text
+                // FFmpeg Logic: Capture frame @ 00:00:10 + Overlay Text
                 // Style: Yellow text, Black border, Centered, and Red LIVE Badge
-                const drawTextFilter = `drawtext=text='${safeTitle}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=64:fontcolor=yellow:borderw=4:bordercolor=black`;
+                // Use escaped quotes for text to prevent command injection
+                const cleanTitle = safeTitle.replace(/["\\]/g, ''); 
+                const drawTextFilter = `drawtext=text='${cleanTitle}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=64:fontcolor=yellow:borderw=4:bordercolor=black`;
                 const liveBadgeFilter = `drawtext=text='🔴 LIVE':x=30:y=30:fontsize=32:fontcolor=white:box=1:boxcolor=red@0.8:boxborderw=10`;
                 
+                // Use a proper array-based approach if possible, but here we escape the string
                 const cmd = `"${config.FFMPEG_PATH}" -ss 00:00:10 -i "${videoPath}" -vf "${drawTextFilter},${liveBadgeFilter}" -frames:v 1 -q:v 2 "${thumbPath}" -y`;
                 
                 exec(cmd, (execErr) => {
@@ -576,20 +580,27 @@ export class AutomationEngine {
     }
 
     async processFolderWithAI(folderPath: string, userId: string) {
-        if (!fs.existsSync(folderPath)) throw new Error('Folder tidak ditemukan.');
+        // --- 🛡️ SECURITY: PATH TRAVERSAL GUARD ---
+        const absoluteBase = path.resolve(config.UPLOADS_DIR);
+        const targetPath = path.resolve(folderPath);
         
-        const files = fs.readdirSync(folderPath).filter(f => ['.mp4', '.mkv', '.avi', '.mov'].includes(path.extname(f).toLowerCase()));
-        const { AIService } = require('./services/aiService');
+        if (!targetPath.startsWith(absoluteBase)) {
+            throw new Error('Akses ditolak: Folder di luar directory yang diizinkan!');
+        }
+
+        if (!fs.existsSync(targetPath)) throw new Error('Folder tidak ditemukan.');
+        
+        const files = fs.readdirSync(targetPath).filter(f => ['.mp4', '.mkv', '.avi', '.mov'].includes(path.extname(f).toLowerCase()));
         
         let count = 0;
         for (const file of files) {
-            const fullPath = path.resolve(folderPath, file);
+            const fullPath = path.join(targetPath, file).replace(/\\/g, '/');
             const title = file.replace(path.extname(file), '').replace(/_/g, ' ');
             
             // 1. Register Video if not exist
             const videoId = 'vid-' + Date.now() + '-' + count;
             await new Promise((res) => {
-                dbLayer.db.run(`INSERT OR IGNORE INTO videos (id, title, filepath, user_id) VALUES (?, ?, ?, ?)`, 
+                dbLayer.db.run(`INSERT OR IGNORE INTO videos (id, title, filepath, user_id, upload_date) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`, 
                 [videoId, title, fullPath, userId], () => res(null));
             });
 
@@ -600,11 +611,11 @@ export class AutomationEngine {
             const scheduleId = 'sched-' + Date.now() + '-' + count;
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(0, 0, 0, 0); // Start at midnight tomorrow
+            tomorrow.setHours(0, 0, 0, 0); 
             
             await new Promise((res) => {
-                dbLayer.db.run(`INSERT INTO schedules (id, name, playlist_path, start_time, status, user_id, auto_title, auto_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [scheduleId, aiData.title, fullPath, tomorrow.toISOString(), 'SCHEDULED', userId, aiData.title, aiData.description], () => res(null));
+                dbLayer.db.run(`INSERT INTO schedules (id, name, playlist_path, start_time, status, user_id, privacy, category, is_upload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [scheduleId, aiData.title, fullPath, tomorrow.toISOString(), 'SCHEDULED', userId, 'public', 'Entertainment', 1], () => res(null));
             });
             count++;
         }
