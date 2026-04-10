@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
 import { TOKEN_KEY } from './api';
 import './App.css';
 
@@ -18,6 +18,8 @@ const ChannelManager = lazy(() => import('./pages/ChannelManager'));
 const LiveChat = lazy(() => import('./pages/LiveChat'));
 
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
+import { LogOut, User, Settings as SettingsIcon, Shield } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const DAYS_ID = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
 
@@ -57,6 +59,8 @@ function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [cachedPages, setCachedPages] = useState<Record<string, boolean>>({ dashboard: true });
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const { theme, toggle: toggleTheme } = useTheme();
 
   const handleLogin = (userData: any, remember: boolean) => {
@@ -80,6 +84,16 @@ function App() {
     window.location.hash = '';
     window.location.reload();
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const navItems = [
     { key: 'dashboard', label: 'Dashboard' },
@@ -119,7 +133,37 @@ function App() {
           </div>
           <div className="bar-divider desktop-only-header" />
           <button className="bar-icon-btn" onClick={toggleTheme}>{theme === 'dark' ? '☀️' : '🌙'}</button>
-          <button className="bar-logout-btn" onClick={handleLogout}>OUT</button>
+          
+          <div className="user-profile-wrapper" ref={userMenuRef}>
+            <button className="user-avatar-trigger" onClick={() => setShowUserMenu(!showUserMenu)}>
+              <div className="avatar-circle">
+                {currentUser?.username?.charAt(0).toUpperCase() || 'A'}
+              </div>
+            </button>
+
+            <AnimatePresence>
+              {showUserMenu && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="user-dropdown-menu"
+                >
+                  <div className="dropdown-header">
+                    <div className="u-name">{currentUser?.username || 'Admin'}</div>
+                    <div className="u-role"><Shield size={10} /> {currentUser?.role || 'Developer'}</div>
+                  </div>
+                  <div className="dropdown-divider" />
+                  <button className="dropdown-item" onClick={() => { setActivePage('settings'); setShowUserMenu(false); }}>
+                    <SettingsIcon size={14} /> System Settings
+                  </button>
+                  <button className="dropdown-item logout" onClick={handleLogout}>
+                    <LogOut size={14} /> Log Out
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </header>
 
