@@ -10,26 +10,57 @@ import * as dbLayer from '../database';
  */
 export class MediaProcessor {
     private io: Server;
+    private queue: { videoId: string; inputPath: string; targetRes: string; resolve: Function; reject: Function }[] = [];
+    private isProcessing = false;
 
     constructor(io: Server) {
         this.io = io;
     }
 
     /**
-     * Compress a video file with optimized settings and real-time progress updates.
+     * Compress a video file. Now wraps into a queue system.
      */
     async compressVideo(videoId: string, inputPath: string, targetRes: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            const outputDir = path.dirname(inputPath);
+            console.log(`📥 [MediaProcessor] Task queued for ${videoId} (${targetRes}p)`);
+            this.queue.push({ videoId, inputPath, targetRes, resolve, reject });
+            this.processQueue();
+        });
+    }
+
+    private async processQueue() {
+        if (this.isProcessing || this.queue.length === 0) return;
+
+        this.isProcessing = true;
+        const task = this.queue.shift();
+        if (!task) {
+            this.isProcessing = false;
+            return;
+        }
+
+        const { videoId, inputPath, targetRes, resolve, reject } = task;
+
+        try {
+            const result = await this.executeCompression(videoId, inputPath, targetRes);
+            resolve(result);
+        } catch (err) {
+            reject(err);
+        } finally {
+            this.isProcessing = false;
+            // Process next task in queue with a small delay to let system breathe
+            setTimeout(() => this.processQueue(), 1000);
+        }
+    }
+
+    private async executeCompression(videoId: string, inputPath: string, targetRes: string): Promise<string> {
+        return new Promise((resolve, reject) => {
             const ext = path.extname(inputPath);
             const outputPath = inputPath.replace(ext, `_proc_${targetRes}p${ext}`);
             
-            // Scaling logic: Ensuring even dimensions for libx264
-            // 720p: 1280x720, 1080p: 1920x1080
             const scale = targetRes === '720' ? '1280:720' : '1920:1080';
             const scaleFilter = `scale=${scale}:force_original_aspect_ratio=decrease,pad=${scale}:(ow-iw)/2:(oh-ih)/2`;
 
-            console.log(`🎬 [MediaProcessor] Starting compression for ${videoId} to ${targetRes}p...`);
+            console.log(`🎬 [MediaProcessor] Starting compression: ${videoId}`);
 
             ffmpeg(inputPath)
                 .outputOptions([
@@ -41,14 +72,12 @@ export class MediaProcessor {
                 ])
                 .videoFilters(scaleFilter)
                 .on('start', (commandLine) => {
-                    console.log('🎥 Spawned FFmpeg with command: ' + commandLine);
                     this.io.emit('compressionStarted', { videoId, targetRes });
                 })
                 .on('progress', (progress) => {
                     if (progress.percent) {
                         const percent = Math.round(progress.percent);
                         this.io.emit('compressionProgress', { videoId, percent });
-                        console.log(`📽️ [${videoId}] Compression: ${percent}%`);
                     }
                 })
                 .on('error', (err) => {
@@ -57,7 +86,6 @@ export class MediaProcessor {
                     reject(err);
                 })
                 .on('end', async () => {
-                    console.log(`✅ [${videoId}] Compression Finished!`);
                     this.io.emit('compressionFinished', { videoId, outputPath });
                     
                     try {
@@ -71,27 +99,23 @@ export class MediaProcessor {
         });
     }
 
-    /**
-     * Sync database record with new compressed file details.
-     */
     private async syncDatabase(videoId: string, newPath: string) {
         return new Promise((resolve, reject) => {
-            const stats = fs.statSync(newPath);
-            const fileSize = stats.size;
-            const filename = path.basename(newPath);
+            try {
+                const stats = fs.statSync(newPath);
+                const fileSize = stats.size;
 
-            dbLayer.db.run(
-                `UPDATE videos SET filepath = ?, file_size = ? WHERE id = ?`,
-                [newPath.replace(/\\/g, '/'), fileSize, videoId],
-                (err) => {
-                    if (err) {
-                        console.error('❌ [Database] Failed to sync compressed video metadata:', err.message);
-                        return reject(err);
+                dbLayer.db.run(
+                    `UPDATE videos SET filepath = ?, file_size = ? WHERE id = ?`,
+                    [newPath.replace(/\\/g, '/'), fileSize, videoId],
+                    (err) => {
+                        if (err) return reject(err);
+                        resolve(null);
                     }
-                    console.log(`💾 [Database] Synced metadata for compressed video ${videoId}.`);
-                    resolve(null);
-                }
-            );
+                );
+            } catch (e) {
+                reject(e);
+            }
         });
     }
 }

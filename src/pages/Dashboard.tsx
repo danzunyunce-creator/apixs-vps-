@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Activity, Eye, Cpu, HardDrive, Zap, Shield, 
-  Server, Clock, AlertTriangle, RefreshCw 
+  Server, Clock, AlertTriangle, RefreshCw, MessageCircle
 } from 'lucide-react';
 import { apiFetch } from '../api';
 import './ModuleCommon.css';
@@ -37,7 +37,11 @@ const METRIC_COLORS: any = {
     violet: '#8b5cf6'
 };
 
-export default function Dashboard() {
+interface DashboardProps {
+    onChatOpen?: (id: string) => void;
+}
+
+export default function Dashboard({ onChatOpen }: DashboardProps) {
     const [metrics, setMetrics] = useState({ 
         cpu: 0, 
         memory: 0, 
@@ -339,8 +343,21 @@ export default function Dashboard() {
                                                     {s.status}
                                                 </span>
                                             </td>
-                                            <td>
-                                                <button onClick={() => triggerRestart(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><RefreshCw size={16} /></button>
+                                            <td style={{ display: 'flex', gap: '8px' }}>
+                                                <button 
+                                                    onClick={() => triggerRestart(s.id)} 
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                                                    title="Restart Worker"
+                                                >
+                                                    <RefreshCw size={16} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => onChatOpen?.(s.id)} 
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6366f1' }}
+                                                    title="Open Comment Hub"
+                                                >
+                                                    <MessageCircle size={16} />
+                                                </button>
                                             </td>
                                         </motion.tr>
                                     ))}

@@ -169,7 +169,15 @@ function App() {
 
       <main className="compact-workspace">
         <Suspense fallback={<div className="sync-spinner">SYNCING...</div>}>
-            <div style={{ display: activePage === 'dashboard' ? 'block' : 'none' }}>{cachedPages['dashboard'] && <Dashboard />}</div>
+            <div style={{ display: activePage === 'dashboard' ? 'block' : 'none' }}>
+                {cachedPages['dashboard'] && (
+                    <Dashboard onChatOpen={(id) => {
+                        setActiveChatId(id);
+                        setActivePage('live-chat');
+                        setCachedPages(p => ({ ...p, 'live-chat': true }));
+                    }} />
+                )}
+            </div>
             <div style={{ display: activePage === 'streams' ? 'block' : 'none' }}>
                 {cachedPages['streams'] && (
                     <StreamManagement onChatOpen={(id) => {
