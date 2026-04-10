@@ -579,7 +579,7 @@ export class AutomationEngine {
         });
     }
 
-    async processFolderWithAI(folderPath: string, userId: string) {
+    async processFolderWithAI(folderPath: string, userId: string, options?: { privacy?: string, category?: string }) {
         // --- 🛡️ SECURITY: PATH TRAVERSAL GUARD ---
         const absoluteBase = path.resolve(config.UPLOADS_DIR);
         const targetPath = path.resolve(folderPath);
@@ -593,6 +593,9 @@ export class AutomationEngine {
         const files = fs.readdirSync(targetPath).filter(f => ['.mp4', '.mkv', '.avi', '.mov'].includes(path.extname(f).toLowerCase()));
         
         let count = 0;
+        const targetPrivacy = options?.privacy || 'public';
+        const targetCategory = options?.category || 'Entertainment';
+
         for (const file of files) {
             const fullPath = path.join(targetPath, file).replace(/\\/g, '/');
             const title = file.replace(path.extname(file), '').replace(/_/g, ' ');
@@ -615,7 +618,7 @@ export class AutomationEngine {
             
             await new Promise((res) => {
                 dbLayer.db.run(`INSERT INTO schedules (id, name, playlist_path, start_time, status, user_id, privacy, category, is_upload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [scheduleId, aiData.title, fullPath, tomorrow.toISOString(), 'SCHEDULED', userId, 'public', 'Entertainment', 1], () => res(null));
+                [scheduleId, aiData.title, fullPath, tomorrow.toISOString(), 'SCHEDULED', userId, targetPrivacy, targetCategory, 1], () => res(null));
             });
             count++;
         }

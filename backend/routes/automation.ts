@@ -177,10 +177,10 @@ export const createAutomationRouter = (autoEngine: AutomationEngine) => {
 
     // 5b. BULK AI INGESTION
     router.post('/bulk-ingest', authMiddleware, async (req, res) => {
-        const { folderPath } = req.body;
+        const { folderPath, privacy, category } = req.body;
         const userId = (req as any).user.id;
         try {
-            const count = await autoEngine.processFolderWithAI(folderPath, userId);
+            const count = await autoEngine.processFolderWithAI(folderPath, userId, { privacy, category });
             res.json({ message: `Successfully ingested ${count} videos with AI metadata.`, count });
         } catch (err: any) {
             res.status(500).json({ error: err.message });

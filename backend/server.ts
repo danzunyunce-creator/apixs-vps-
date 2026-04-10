@@ -58,7 +58,7 @@ app.use('/api/system', systemRoutes);
 app.use('/api/config', settingsRoutes);
 
 // ── Serve Frontend (dist/ folder) ──
-const DIST_PATH = path.join(__dirname, 'dist');
+const DIST_PATH = config.FRONTEND_DIST;
 if (fs.existsSync(DIST_PATH)) {
     app.use(express.static(DIST_PATH));
 }

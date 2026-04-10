@@ -12,7 +12,6 @@ const Watchdog = lazy(() => import('./pages/Watchdog'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Analytics = lazy(() => import('./pages/Analytics'));
-const UltimateAutomation = lazy(() => import('./pages/UltimateAutomation'));
 const Login = lazy(() => import('./pages/Login'));
 const ChannelManager = lazy(() => import('./pages/ChannelManager'));
 const LiveChat = lazy(() => import('./pages/LiveChat'));
