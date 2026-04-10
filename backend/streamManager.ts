@@ -41,8 +41,8 @@ export interface StreamDesc {
 export class StreamManager {
     private io: Server;
     public activeStreams: Map<string, StreamDesc>;
-    private MAX_RESTARTS = 5;
-    private RESTART_TIMEOUT_MS = 5000;
+    private MAX_RESTARTS = 99;              // Unlimited praktis — reset otomatis setiap 30 menit uptime
+    private BASE_RESTART_DELAY_MS = 5000;  // Exponential backoff: 5s → 15s → 30s → 60s → 120s (cap)
     private LOG_THROTTLE_MS = 500;
     private autoEngine: any = null;
     private availableEncoder: string = 'libx264'; 
@@ -52,9 +52,32 @@ export class StreamManager {
         this.io = io;
         this.activeStreams = new Map();
         this.startMetricsBroadcast();
-        this.startZombieWatchdog(); // Lifecycle management
+        this.startZombieWatchdog();
+        this.startRestartCountReset(); // ← Reset restartCount setiap 30 menit uptime
         this.probeEncoders();
         this.setupExitHandlers();
+    }
+
+    /**
+     * RESILIENCE GUARD: Reset restart counter setiap 30 menit stream berjalan normal.
+     * Ini memastikan stream yang stabil tidak "punished" oleh crash sesaat yang terjadi di masa lampau.
+     */
+    private startRestartCountReset() {
+        setInterval(() => {
+            for (const [id, desc] of this.activeStreams) {
+                const uptimeMs = Date.now() - desc.startedAt;
+                if (uptimeMs > 30 * 60 * 1000 && desc.restartCount > 0) {
+                    desc.restartCount = 0;
+                    console.log(`[Watchdog] ✅ Stream ${id} stabil 30 menit — restart counter di-reset.`);
+                }
+            }
+        }, 5 * 60 * 1000); // Cek setiap 5 menit
+    }
+
+    /** Hitung delay restart dengan exponential backoff (cap 120 detik) */
+    private getRestartDelay(restartCount: number): number {
+        const delay = this.BASE_RESTART_DELAY_MS * Math.pow(2, Math.min(restartCount - 1, 4));
+        return Math.min(delay, 120_000); // Cap 2 menit
     }
 
     private setupExitHandlers() {
@@ -436,33 +459,43 @@ export class StreamManager {
                     try {
                         desc.restartCount = (desc.restartCount || 0) + 1;
                         const newCount = desc.restartCount;
-                        const failMsg = `Stream crashed! Restart count updated to: ${newCount}`;
+                        const delay = this.getRestartDelay(newCount);
+                        const delaySec = Math.round(delay / 1000);
+
+                        const failMsg = `Stream crashed (code ${code}). Uptime: ${desc.uptime}. Restart attempt #${newCount} dalam ${delaySec}s...`;
                         this.emitLog(id, 'error', failMsg);
                         dbLayer.saveSystemLog(id, 'error', failMsg).catch(() => {});
 
-                        if (newCount <= this.MAX_RESTARTS) {
-                            const warnMsg = `Watchdog: Restarting stream in ${this.RESTART_TIMEOUT_MS / 1000}s... (Attempt ${newCount}/${this.MAX_RESTARTS})`;
-                            this.emitLog(id, 'warn', warnMsg);
-
-                            this.activeStreams.set(id, desc);
-
-                            desc.restartTimer = setTimeout(() => {
-                                if (desc.meta) {
-                                    this._spawnFFmpeg(id, desc.meta, newCount);
-                                }
-                            }, this.RESTART_TIMEOUT_MS);
-                        } else {
-                            const fatalMsg = `🛑 <b>CRITICAL FAILURE:</b> Max restarts (${this.MAX_RESTARTS}) reached for <b>${id}</b>. Watchdog gave up.`;
-                            this.emitLog(id, 'error', fatalMsg);
-                            dbLayer.saveSystemLog(id, 'error', fatalMsg).catch(() => {});
-                            telegramService.sendMessage(fatalMsg).catch(() => {});
-                            
-                            await dbLayer.updateStreamStatus(id, 'ERROR').catch(() => {});
-                            this.io.emit('stream_status_change', { id, status: 'ERROR' });
+                        // Kirim Telegram alert di setiap crash (bukan hanya fatal)
+                        if (newCount === 1 || newCount % 5 === 0) {
+                            telegramService.sendMessage(
+                                `🔄 <b>WATCHDOG RESTART:</b> Stream <b>${id}</b> crash (code ${code}).\n` +
+                                `Uptime sebelumnya: <b>${desc.uptime}</b>\n` +
+                                `Restart attempt: <b>#${newCount}</b> (backoff: ${delaySec}s)`
+                            ).catch(() => {});
                         }
+
+                        const warnMsg = `Watchdog: Exponential backoff ${delaySec}s aktif (Attempt #${newCount})`;
+                        this.emitLog(id, 'warn', warnMsg);
+
+                        // Simpan state di map agar timer tidak hilang
+                        this.activeStreams.set(id, desc);
+
+                        desc.restartTimer = setTimeout(() => {
+                            if (desc.meta) {
+                                this._spawnFFmpeg(id, desc.meta, newCount);
+                            }
+                        }, delay);
+
                     } catch (err) {
                         console.error('Failed to handle auto restart logic:', err);
                     }
+                } else if (desc && !desc.autoRestart) {
+                    // Stream dihentikan manual atau karena error path/security — tetap kirim notif
+                    telegramService.sendMessage(
+                        `🔴 <b>STREAM STOPPED:</b> <b>${id}</b> (code ${code})\nUptime: <b>${desc.uptime}</b>\nAuto-restart: DISABLED`
+                    ).catch(() => {});
+                    await dbLayer.updateStreamStatus(id, 'STOP').catch(() => {});
                 }
             });
 
@@ -558,10 +591,13 @@ export class StreamManager {
 
                 const streamStats = Array.from(this.activeStreams.entries()).map(([id, desc]) => ({
                     id: id,
-                    cpu: Math.floor(Math.random() * 15) + 5, // Simulated per-stream CPU
+                    cpu: cpuUsage > 0 && this.activeStreams.size > 0
+                        ? Math.round(cpuUsage / this.activeStreams.size) // Distribusi rata CPU per stream
+                        : 0,
                     bitrate: parseInt(desc.bitrate.replace(' kbps', '')) || 0,
-                    fps: 30, // Default for now, can be parsed from stderr if needed
-                    status: 'OK' as const
+                    uptime: desc.uptime,
+                    restartCount: desc.restartCount,
+                    status: (desc.lastDataTime && (Date.now() - desc.lastDataTime) < 90_000) ? 'OK' as const : 'STALL' as const
                 }));
 
                 const payload = {

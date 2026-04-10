@@ -8,6 +8,8 @@ const httpsAgent = new https.Agent({ keepAlive: true });
 
 class YoutubeApiManager {
     private quotaLockUntil: number | null = null;
+    private usingBackupKey: boolean = false;
+    private backupKeyExhausted: boolean = false;
 
     constructor() {
         this.quotaLockUntil = null;
@@ -15,30 +17,40 @@ class YoutubeApiManager {
 
     private getResetDelayMs(): number {
         const resetTime = new Date();
-        resetTime.setHours(16, 0, 0, 0); // Reset at 16:00
+        resetTime.setHours(16, 0, 0, 0); // YouTube quota reset at 16:00 WIB (UTC+8 = 08:00 UTC)
         if (Date.now() > resetTime.getTime()) resetTime.setDate(resetTime.getDate() + 1);
         return resetTime.getTime() - Date.now();
     }
 
     private async getOAuthConfig(): Promise<{ yt_client_id: string; yt_client_secret: string }> {
         return new Promise((resolve, reject) => {
-            dbLayer.db.all(`SELECT key, value FROM app_config WHERE key IN ('yt_client_id', 'yt_client_secret')`, [], (err, rows: any[]) => {
-                if (err) return reject(err);
-                const cfg: any = {};
-                rows.forEach(r => { cfg[r.key] = r.value; });
-                
-                // Decrypt sensitive OAuth config
-                const clientId = CryptoProvider.decrypt(cfg.yt_client_id);
-                const clientSecret = CryptoProvider.decrypt(cfg.yt_client_secret);
+            // Jika sedang failover, coba ambil Backup OAuth Credentials dulu
+            const keys = this.usingBackupKey
+                ? ['yt_client_id_2', 'yt_client_secret_2']
+                : ['yt_client_id', 'yt_client_secret'];
 
-                if (!clientId || !clientSecret) {
-                    return reject(new Error('OAuth Credentials belum di-set di Pengaturan (Client ID / Secret).'));
+            const keyPlaceholders = keys.map(() => '?').join(', ');
+            dbLayer.db.all(
+                `SELECT key, value FROM app_config WHERE key IN (${keyPlaceholders})`,
+                keys,
+                (err, rows: any[]) => {
+                    if (err) return reject(err);
+                    const cfg: any = {};
+                    rows.forEach(r => { cfg[r.key] = r.value; });
+
+                    const clientIdKey   = this.usingBackupKey ? 'yt_client_id_2'     : 'yt_client_id';
+                    const clientSecKey  = this.usingBackupKey ? 'yt_client_secret_2'  : 'yt_client_secret';
+
+                    const clientId     = CryptoProvider.decrypt(cfg[clientIdKey]);
+                    const clientSecret = CryptoProvider.decrypt(cfg[clientSecKey]);
+
+                    if (!clientId || !clientSecret) {
+                        const label = this.usingBackupKey ? 'Backup' : 'Primary';
+                        return reject(new Error(`${label} OAuth Credentials belum di-set di Pengaturan.`));
+                    }
+                    resolve({ yt_client_id: clientId, yt_client_secret: clientSecret });
                 }
-                resolve({
-                    yt_client_id: clientId,
-                    yt_client_secret: clientSecret
-                });
-            });
+            );
         });
     }
 
@@ -57,6 +69,46 @@ class YoutubeApiManager {
                 if (!row) return reject(new Error('Tidak ada channel terhubung dengan OAuth. Harap login kembali di Manajemen Akun.'));
                 resolve(row);
             });
+        });
+    }
+
+    /** 
+     * Beralih ke Backup OAuth Key saat primary quota habis.
+     * Reset otomatis ke Primary setelah jam reset YouTube (16:00 WIB).
+     */
+    private async activateBackupKeyFailover(): Promise<boolean> {
+        if (this.backupKeyExhausted) return false;
+
+        // Cek apakah backup key tersedia di database
+        return new Promise((resolve) => {
+            dbLayer.db.get(
+                `SELECT value FROM app_config WHERE key = 'yt_client_id_2'`,
+                [],
+                (err, row: any) => {
+                    const backupId = row?.value ? CryptoProvider.decrypt(row.value) : null;
+                    if (backupId) {
+                        this.usingBackupKey = true;
+                        const msg = '🔄 <b>API FAILOVER:</b> Primary YouTube OAuth Key kuota habis. Beralih ke <b>Backup Key</b> secara otomatis.';
+                        console.warn('[YoutubeApiManager] ' + msg);
+                        telegramService.sendMessage(msg).catch(() => {});
+                        dbLayer.saveSystemLog(null, 'warn', msg).catch(() => {});
+
+                        // Auto-reset ke primary key setelah jam reset quota
+                        const resetDelay = this.getResetDelayMs();
+                        setTimeout(() => {
+                            this.usingBackupKey = false;
+                            this.backupKeyExhausted = false;
+                            this.quotaLockUntil = null;
+                            console.log('[YoutubeApiManager] ✅ Quota reset \u2014 kembali ke Primary Key.');
+                            telegramService.sendMessage('✅ <b>API RECOVERY:</b> Quota YouTube direset. Kembali menggunakan Primary API Key.').catch(() => {});
+                        }, resetDelay);
+
+                        resolve(true);
+                    } else {
+                        resolve(false); // Tidak ada backup key
+                    }
+                }
+            );
         });
     }
 
@@ -92,15 +144,27 @@ class YoutubeApiManager {
             return await actionFn(youtube, channel);
             
         } catch (err: any) {
+            // --- 🔄 SMART FAILOVER: Primary Key Quota Exceeded ---
             if (err.response?.data?.error?.errors?.[0]?.reason === 'quotaExceeded') {
-                const msg = '⚠️ [API] YouTube Quota Exceeded. Fitur SEO & Analytics akan tertidur sampai reset jam 16:00 WIB.';
-                console.warn(msg);
-                
+                if (!this.usingBackupKey) {
+                    // Coba failover ke backup key
+                    const failedOver = await this.activateBackupKeyFailover();
+                    if (failedOver) {
+                        console.log('[YoutubeApiManager] Retrying dengan Backup Key...');
+                        return this.execute(actionFn, targetChannelId); // Retry dengan backup
+                    }
+                } else {
+                    // Backup key juga habis
+                    this.backupKeyExhausted = true;
+                }
+
+                const msg = '🚨 <b>API CRITICAL:</b> Semua YouTube API Key habis kuota. Fitur SEO & Analytics dinonaktifkan sampai reset jam 16:00 WIB.';
+                console.warn('[YoutubeApiManager] ' + msg);
                 dbLayer.saveSystemLog(null, 'warn', msg).catch(() => {});
-                telegramService.sendMessage(`🚨 <b>API ALERT:</b> ${msg}`).catch(() => {});
+                telegramService.sendMessage(msg).catch(() => {});
 
                 this.quotaLockUntil = Date.now() + this.getResetDelayMs();
-                throw new Error('Semua API Key kehabisan Kuota. Smart Delay diaktifkan.');
+                throw new Error('Semua API Key kehabisan Kuota. Smart Delay diaktifkan hingga reset jam 16:00.');
             }
             throw err;
         }
@@ -108,5 +172,5 @@ class YoutubeApiManager {
 }
 
 export const youtubeApi = new YoutubeApiManager();
-// Add back compatible direct exports if needed, or update consumers
 export const execute = youtubeApi.execute.bind(youtubeApi);
+
