@@ -80,6 +80,25 @@ export class AutomationEngine {
         if (await this.isRuleEnabled('SEO Hourly Title Rotator')) {
             this.rotateStreamSEO();
         }
+        
+        // --- 📊 METRICS: Record hourly peak for analytics ---
+        this.logHourlyMetrics();
+    }
+
+    private logHourlyMetrics() {
+        console.log('📊 [AutomationEngine] Recording hourly performance metrics...');
+        for (let [id, desc] of this.sm.activeStreams) {
+            const viewers = desc.viewers || 0;
+            const bitrate = parseInt(desc.bitrate.replace(' kbps', '')) || 0;
+            
+            // Get lastCpuStats as a rough estimate for the whole node split by streams
+            const cpu = 0; // Placeholder, would need per-stream calculation if available
+
+            dbLayer.db.run(
+                `INSERT INTO stream_metrics (stream_id, viewers, bitrate, cpu_usage) VALUES (?, ?, ?, ?)`,
+                [id, viewers, bitrate, cpu]
+            );
+        }
     }
 
     private async sendHealthPulse() {

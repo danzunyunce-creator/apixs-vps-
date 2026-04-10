@@ -197,12 +197,30 @@ export default function Dashboard() {
             {/* METRICS GRID */}
             <NodeGrid nodes={nodes} />
 
-            <div className="pro-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: '30px' }}>
+            <div className="pro-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: '30px', gap: '20px' }}>
                 <MetricCard icon={<Activity />} label="ACTIVE INSTANCES" value={metrics.activeStreams} color="indigo" variants={cardVariants} />
                 <MetricCard icon={<Eye />} label="TOTAL REACH" value={metrics.totalViews.toLocaleString()} color="emerald" variants={cardVariants} />
                 <MetricCard icon={<Cpu />} label="CPU LOAD" value={`${metrics.cpu}%`} color="rose" variants={cardVariants} />
                 <MetricCard icon={<Server />} label="RAM USAGE" value={`${metrics.memory}%`} color="amber" variants={cardVariants} />
-                <MetricCard icon={<HardDrive />} label="DISK FREE" value={metrics.health?.disk || 'PROBING'} color="cyan" variants={cardVariants} />
+                <MetricCard 
+                    icon={<HardDrive />} 
+                    label="DISK FREE" 
+                    value={metrics.health?.disk || 'PROBING'} 
+                    color="cyan" 
+                    variants={cardVariants} 
+                    footer={
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', marginTop: '10px', overflow: 'hidden' }}>
+                            <div 
+                                style={{ 
+                                    width: metrics.health?.disk ? `${100 - (parseFloat(metrics.health.disk) / 50 * 100)}%` : '0%', // Rough estimate assuming 50GB total if disk string is like '45.2 GB Free'
+                                    height: '100%', 
+                                    background: '#06b6d4',
+                                    transition: 'width 1s ease'
+                                }} 
+                            />
+                        </div>
+                    }
+                />
                 <MetricCard icon={<Zap />} label="FFMPEG ENGINE" value={metrics.health?.encoder || 'CPU'} color="violet" variants={cardVariants} />
             </div>
 

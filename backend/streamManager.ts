@@ -56,6 +56,9 @@ export class StreamManager {
         this.startRestartCountReset(); // ← Reset restartCount setiap 30 menit uptime
         this.probeEncoders();
         this.setupExitHandlers();
+
+        // --- 🚀 Enterprise Resilience: Auto-Resume after boot ---
+        setTimeout(() => this.initAutoResume(), 5000); 
     }
 
     /**
@@ -158,6 +161,9 @@ export class StreamManager {
                 console.error('[StreamManager] Account resolution failed', e);
             }
         }
+        
+        // --- 🛡️ PERSISTENCE: Save state before spawn ---
+        await dbLayer.db.run(`UPDATE streams SET should_be_running = 1 WHERE id = ?`, [id]);
 
         this._spawnFFmpeg(id, meta);
     }
@@ -199,6 +205,7 @@ export class StreamManager {
 
         this.emitLog(id, 'success', `Stream ${id} termination sequence initiated.`);
         dbLayer.updateStreamStatus(id, 'STOP').catch(console.error);
+        dbLayer.db.run(`UPDATE streams SET should_be_running = 0 WHERE id = ?`, [id]);
     }
 
     public emergencyStopAll() {
@@ -620,6 +627,37 @@ export class StreamManager {
                 console.error('[Metrics] Failed to broadcast:', err);
             }
         }, 7000); // Hemat Quota: 7 seconds interval
+    }
+
+    /**
+     * AUTO-RESUME: Mencari stream yang seharusnya menyala (should_be_running = 1)
+     * tapi saat ini tidak aktif di Map (baru booting).
+     */
+    private async initAutoResume() {
+        console.log('🔄 [StreamManager] Checking for streams to auto-resume...');
+        dbLayer.db.all(`SELECT * FROM streams WHERE should_be_running = 1`, [], async (err, rows: any[]) => {
+            if (err || !rows || rows.length === 0) return;
+
+            console.log(`🚀 [Auto-Resume] Found ${rows.length} streams to restart...`);
+            for (const row of rows) {
+                const meta: StreamMeta = {
+                    rtmp_url: row.rtmp_url,
+                    stream_key: row.stream_key,
+                    filepath: row.filepath || row.playlist_path,
+                    input_source: row.playlist_path || row.filepath,
+                    is_concat: !!row.playlist_path,
+                    loop_video: row.loop_video === 1,
+                    youtube_account_id: row.youtube_account_id,
+                    server_id: 'auto-resume-vps'
+                };
+                
+                // Delay staggered start to avoid CPU spike
+                await new Promise(res => setTimeout(res, 2000));
+                this.startStream(row.id, meta).catch(err => {
+                    console.error(`[Auto-Resume] Failed to restart ${row.id}:`, err);
+                });
+            }
+        });
     }
 }
 

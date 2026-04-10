@@ -93,8 +93,17 @@ async function createTables(): Promise<void> {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             user_id TEXT,
             restart_count INTEGER DEFAULT 0,
+            should_be_running BOOLEAN DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(id),
             FOREIGN KEY (video_id) REFERENCES videos(id)
+        )`,`CREATE TABLE IF NOT EXISTS stream_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stream_id TEXT NOT NULL,
+            viewers INTEGER DEFAULT 0,
+            bitrate INTEGER DEFAULT 0,
+            cpu_usage INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (stream_id) REFERENCES streams(id)
         )`,
         `CREATE TABLE IF NOT EXISTS stream_history (
             id TEXT PRIMARY KEY,
@@ -318,6 +327,7 @@ export async function initializeDatabase(): Promise<void> {
 
   await safeAddColumn('videos', 'tags', 'TEXT');
   await safeAddColumn('videos', 'category', 'TEXT');
+  await safeAddColumn('streams', 'should_be_running', 'BOOLEAN DEFAULT 0');
   await safeAddColumn('streams', 'restart_count', 'INTEGER DEFAULT 0');
   await safeAddColumn('schedules', 'stream_id', 'TEXT');
   await safeAddColumn('schedules', 'youtube_account_id', 'TEXT');
