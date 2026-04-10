@@ -55,7 +55,7 @@ app.use('/api/schedules', createScheduleRouter(streamManager, io));
 app.use('/api/automation', createAutomationRouter(autoEngine));
 app.use('/api/nodes', nodesRoutes);
 app.use('/api/system', systemRoutes);
-app.use('/api/config', settingsRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // ── Serve Frontend (dist/ folder) ──
 const DIST_PATH = path.join(__dirname, 'dist');

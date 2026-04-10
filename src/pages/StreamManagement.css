@@ -172,6 +172,7 @@
 /* --- STREAMS ROW SYSTEM (REMOVED) --- */
 
 /* --- MAGIC TOOLKIT MODAL --- */
+.toolkit-modal {
     border: 1px solid var(--accent-indigo) !important;
     box-shadow: 0 0 50px rgba(99, 102, 241, 0.2) !important;
 }
@@ -455,6 +456,13 @@
 }
 
 /* TABLE UI & BULK ACTION BAR */
+.channel-summary-bar {
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 12px 12px 0 0;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
     border-bottom: 1px solid var(--glass-border);
 }
 
@@ -584,6 +592,14 @@
     color: #e2e8f0;
 }
 
+.badge-job {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.7rem;
+}
+.badge-job.running { background: #10b981; color: white; }
+.badge-job.queued { background: #f59e0b; color: white; }
 .badge-job.done { background: rgba(255, 255, 255, 0.1); color: #94a3b8; }
 
 @media (max-width: 768px) {
